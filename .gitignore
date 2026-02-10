@@ -13,3 +13,6 @@ wheels/
 .cpcache
 .venv
 .lsp
+node_modules/
+.shadow-cljs
+public

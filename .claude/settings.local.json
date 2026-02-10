@@ -8,7 +8,8 @@
       "Bash(pdfinfo:*)",
       "Bash(pdftotext:*)",
       "Bash(clj:*)",
-      "Bash(python create_sheet.py:*)"
+      "Bash(python create_sheet.py:*)",
+      "Bash(npx shadow-cljs:*)"
     ]
   }
 }

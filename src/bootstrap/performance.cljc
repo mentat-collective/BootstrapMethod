@@ -10,6 +10,27 @@
     (optimum-speeds (performance-table r182-data-plate r182-ops))")
 
 ;; =============================================================================
+;; Cross-platform math helpers
+;; =============================================================================
+
+(defn pow [base exp]
+  #?(:clj (Math/pow base exp) :cljs (js/Math.pow base exp)))
+
+(defn sqrt [x]
+  #?(:clj (Math/sqrt x) :cljs (js/Math.sqrt x)))
+
+(defn asin [x]
+  #?(:clj (Math/asin x) :cljs (js/Math.asin x)))
+
+(defn atan [x]
+  #?(:clj (Math/atan x) :cljs (js/Math.atan x)))
+
+(def PI #?(:clj Math/PI :cljs js/Math.PI))
+
+(defn degrees [radians]
+  (* radians (/ 180.0 PI)))
+
+;; =============================================================================
 ;; Constants
 ;; =============================================================================
 
@@ -114,7 +135,7 @@
   (let [temp-ratio (- 1.0 (/ (* lapse-rate density-altitude) T0-rankine))
         ;; The exponent 1/0.234957 ≈ 4.2559 comes from the standard atmosphere
         ;; derivation: g/(R*L) - 1 where g=32.174, R=1716.5, L=0.003566
-        sigma      (Math/pow temp-ratio (/ 1.0 0.234957))
+        sigma      (pow temp-ratio (/ 1.0 0.234957))
         rho        (* rho0 sigma)
         ;; Gagg-Ferrar engine power lapse: phi = (sigma - C) / (1 - C)
         phi        (/ (- sigma C) (- 1.0 C))]
@@ -204,8 +225,8 @@
   (let [X       (power-adjustment-factor TAF)
         SDF     (slow-down-factor Z tractor?)
         J       (/ V-fps (* n-rps d))
-        CP      (/ P-ftlbfs (* rho (Math/pow n-rps 3) (Math/pow d 5)))
-        h-power (/ J (Math/pow CP (/ 1.0 3.0)))
+        CP      (/ P-ftlbfs (* rho (pow n-rps 3) (pow d 5)))
+        h-power (/ J (pow CP (/ 1.0 3.0)))
         CPX     (/ CP X)
         eta-raw (gagpc-interpolate CPX h-power)
         eta     (* eta-raw SDF)]
@@ -236,7 +257,7 @@
         A      (/ (* B B) S)
         thrust (/ (* eta P-ftlbfs) V-fps)
         Dp     (* CD0 q S)
-        Di     (/ (* W W) (* q S Math/PI A e))
+        Di     (/ (* W W) (* q S PI A e))
         drag   (+ Dp Di)]
     {:thrust thrust
      :Dp     Dp
@@ -268,7 +289,7 @@
         n-rps    (/ N 60.0)
 
         ;; Airspeed conversions
-        ktas  (/ kcas (Math/sqrt sigma))
+        ktas  (/ kcas (sqrt sigma))
         V-fps (* ktas kt->fps)
 
         ;; Propeller efficiency
@@ -285,13 +306,13 @@
         ;; Angle of climb (powered), degrees
         ;; Clamp argument to asin to [-1, 1] for safety
         sin-arg (max -1.0 (min 1.0 (/ excess-thrust W)))
-        AOC     (Math/toDegrees (Math/asin sin-arg))
+        AOC     (degrees (asin sin-arg))
 
         ;; Rate of sink (gliding), ft/min
         ROS (* (/ (* (:drag frc) V-fps) W) 60.0)
 
         ;; Angle of glide, degrees
-        AOG (Math/toDegrees (Math/atan (/ (:drag frc) W)))]
+        AOG (degrees (atan (/ (:drag frc) W)))]
 
     {:KCAS    kcas
      :KTAS    ktas
@@ -374,50 +395,53 @@
      :VM  (when vm (select-keys vm [:KCAS]))}))
 
 ;; =============================================================================
-;; Convenience / REPL
+;; Convenience / REPL (JVM only — uses format which is not available in CLJS)
 ;; =============================================================================
 
-(defn print-table
-  "Print a performance table in a readable format."
-  [table]
-  (println (format "%7s %7s %7s %7s %7s %7s %7s %7s %7s"
-                   "KCAS" "KTAS" "eta" "thrust" "drag" "ROC" "AOC" "ROS" "AOG"))
-  (println (apply str (repeat 72 "-")))
-  (doseq [row table]
-    (println (format "%7.1f %7.1f %7.3f %7.1f %7.1f %7.1f %7.2f %7.1f %7.2f"
-                     (double (:KCAS row)) (double (:KTAS row)) (double (:eta row))
-                     (double (:thrust row)) (double (:drag row))
-                     (double (:ROC row)) (double (:AOC row))
-                     (double (:ROS row)) (double (:AOG row))))))
+#?(:clj
+   (defn print-table
+     "Print a performance table in a readable format."
+     [table]
+     (println (format "%7s %7s %7s %7s %7s %7s %7s %7s %7s"
+                      "KCAS" "KTAS" "eta" "thrust" "drag" "ROC" "AOC" "ROS" "AOG"))
+     (println (apply str (repeat 72 "-")))
+     (doseq [row table]
+       (println (format "%7.1f %7.1f %7.3f %7.1f %7.1f %7.1f %7.2f %7.1f %7.2f"
+                        (double (:KCAS row)) (double (:KTAS row)) (double (:eta row))
+                        (double (:thrust row)) (double (:drag row))
+                        (double (:ROC row)) (double (:AOC row))
+                        (double (:ROS row)) (double (:AOG row)))))))
 
-(defn print-optimums
-  "Print optimum speeds in a readable format."
-  [opts]
-  (println "\nOptimum Speeds:")
-  (println (format "  Vy  (best ROC):    %5.1f KCAS, ROC = %.1f ft/min"
-                   (get-in opts [:Vy :KCAS]) (get-in opts [:Vy :ROC])))
-  (println (format "  Vx  (best AOC):    %5.1f KCAS, AOC = %.2f°"
-                   (get-in opts [:Vx :KCAS]) (get-in opts [:Vx :AOC])))
-  (println (format "  Vbg (best glide):  %5.1f KCAS, AOG = %.2f°"
-                   (get-in opts [:Vbg :KCAS]) (get-in opts [:Vbg :AOG])))
-  (println (format "  Vmd (min sink):    %5.1f KCAS, ROS = %.1f ft/min"
-                   (get-in opts [:Vmd :KCAS]) (get-in opts [:Vmd :ROS])))
-  (when (:VM opts)
-    (println (format "  VM  (max level):   %5.1f KCAS"
-                     (get-in opts [:VM :KCAS])))))
+#?(:clj
+   (defn print-optimums
+     "Print optimum speeds in a readable format."
+     [opts]
+     (println "\nOptimum Speeds:")
+     (println (format "  Vy  (best ROC):    %5.1f KCAS, ROC = %.1f ft/min"
+                      (get-in opts [:Vy :KCAS]) (get-in opts [:Vy :ROC])))
+     (println (format "  Vx  (best AOC):    %5.1f KCAS, AOC = %.2f°"
+                      (get-in opts [:Vx :KCAS]) (get-in opts [:Vx :AOC])))
+     (println (format "  Vbg (best glide):  %5.1f KCAS, AOG = %.2f°"
+                      (get-in opts [:Vbg :KCAS]) (get-in opts [:Vbg :AOG])))
+     (println (format "  Vmd (min sink):    %5.1f KCAS, ROS = %.1f ft/min"
+                      (get-in opts [:Vmd :KCAS]) (get-in opts [:Vmd :ROS])))
+     (when (:VM opts)
+       (println (format "  VM  (max level):   %5.1f KCAS"
+                        (get-in opts [:VM :KCAS]))))))
 
-(defn run-validation
-  "Run the R182 validation case and print results."
-  []
-  (let [table (performance-table r182-data-plate r182-ops)
-        opts  (optimum-speeds table)]
-    (print-table table)
-    (print-optimums opts)
-    opts))
+#?(:clj
+   (defn run-validation
+     "Run the R182 validation case and print results."
+     []
+     (let [table (performance-table r182-data-plate r182-ops)
+           opts  (optimum-speeds table)]
+       (print-table table)
+       (print-optimums opts)
+       opts)))
 
 (comment
   ;; REPL usage:
-  (run-validation)
+  #?(:clj (run-validation))
 
   ;; Or step by step:
   (atmosphere 8000 0.12)
