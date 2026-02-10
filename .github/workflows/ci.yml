@@ -32,7 +32,7 @@ jobs:
           key: clj-${{ hashFiles('deps.edn') }}
 
       - name: Clojure tests
-        run: clj -M:test
+        run: clojure -M:test
 
       # ── Node (for shadow-cljs compile check) ──
       - uses: actions/setup-node@v4

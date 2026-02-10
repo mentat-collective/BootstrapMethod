@@ -10,6 +10,7 @@ Upload the resulting .xlsx to Google Sheets.
 
 import openpyxl
 from openpyxl.chart import ScatterChart, Reference, Series
+from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.trendline import Trendline
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, numbers
@@ -439,11 +440,14 @@ def create_tab2_flight_tests(wb):
     chart1.width = 18
     chart1.height = 12
 
-    x_data = Reference(ws, min_col=10, min_row=31, max_row=43)  # V⁴ (col J)
-    y_data = Reference(ws, min_col=9, min_row=31, max_row=43)   # V/Δt (col I)
+    x_data = Reference(ws, min_col=10, min_row=32, max_row=43)  # V⁴ (col J)
+    y_data = Reference(ws, min_col=9, min_row=32, max_row=43)   # V/Δt (col I)
     series1 = Series(y_data, x_data, title="Glide data")
-    series1.graphicalProperties.line.noFill = True  # scatter, no line
-    series1.trendline = Trendline(trendlineType="linear", dispRSqr=True, dispEq=True)
+    series1.graphicalProperties.line.noFill = True  # scatter, no line between points
+    tl = Trendline(trendlineType="linear", dispRSqr=True, dispEq=True)
+    tl.graphicalProperties = GraphicalProperties()
+    tl.graphicalProperties.line.solidFill = "FF0000"  # red trendline
+    series1.trendline = tl
     chart1.series.append(series1)
     ws.add_chart(chart1, "A86")
 
@@ -455,8 +459,8 @@ def create_tab2_flight_tests(wb):
     chart2.width = 18
     chart2.height = 12
 
-    x_data2 = Reference(ws, min_col=5, min_row=31, max_row=43)  # KCAS (col E)
-    y_data2 = Reference(ws, min_col=8, min_row=31, max_row=43)  # KCAS×Δt (col H)
+    x_data2 = Reference(ws, min_col=5, min_row=32, max_row=43)  # KCAS (col E)
+    y_data2 = Reference(ws, min_col=8, min_row=32, max_row=43)  # KCAS×Δt (col H)
     series2 = Series(y_data2, x_data2, title="Glide data")
     chart2.series.append(series2)
     ws.add_chart(chart2, "A102")
@@ -469,8 +473,8 @@ def create_tab2_flight_tests(wb):
     chart3.width = 18
     chart3.height = 12
 
-    x_data3 = Reference(ws, min_col=5, min_row=63, max_row=75)  # KCAS (col E)
-    y_data3 = Reference(ws, min_col=7, min_row=63, max_row=75)  # ROC (col G)
+    x_data3 = Reference(ws, min_col=5, min_row=64, max_row=75)  # KCAS (col E)
+    y_data3 = Reference(ws, min_col=7, min_row=64, max_row=75)  # ROC (col G)
     series3 = Series(y_data3, x_data3, title="Climb data")
     chart3.series.append(series3)
     ws.add_chart(chart3, "A118")
