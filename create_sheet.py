@@ -12,7 +12,6 @@ import openpyxl
 from openpyxl.chart import ScatterChart, Reference, Series
 from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.chart.label import DataLabelList
-from openpyxl.chart.trendline import Trendline
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, numbers
 from openpyxl.utils import get_column_letter
 
@@ -260,26 +259,34 @@ def create_tab2_flight_tests(wb):
     for i, h in enumerate(headers):
         style_cell(ws, r, i + 1, h, font=BOLD)
 
-    # 12 glide test rows
+    # 12 glide test rows (formulas return "" when input cells are empty)
     for run in range(1, 13):
         row = 31 + run
         style_cell(ws, row, 1, run)  # Run #
         style_cell(ws, row, 2, None, fill=INPUT_FILL)  # Fuel gal
         # Gross weight = empty + pax + baggage + fuel*6
-        style_cell(ws, row, 3, f"=$B$23+$B$24+$B$25+B{row}*6", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 3, f'=IF(B{row}="","",$B$23+$B$24+$B$25+B{row}*6)',
+                   fill=CALC_FILL, fmt="0.0")
         style_cell(ws, row, 4, None, fill=INPUT_FILL)  # KIAS
         # KCAS = KIAS + position error
-        style_cell(ws, row, 5, f"=D{row}+$B$28", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 5, f'=IF(D{row}="","",D{row}+$B$28)', fill=CALC_FILL, fmt="0.0")
         style_cell(ws, row, 6, None, fill=INPUT_FILL)  # delta-t
         # V_TAS in ft/sec = (KCAS / sqrt(sigma)) / 0.5924838
-        style_cell(ws, row, 7, f"=IFERROR((E{row}/SQRT($B$19))/0.5924838,\"\")",
+        style_cell(ws, row, 7,
+                   f'=IF(D{row}="","",IFERROR((E{row}/SQRT($B$19))/0.5924838,""))',
                    fill=CALC_FILL, fmt="0.00")
         # KCAS * delta-t (for visual inspection of the curve)
-        style_cell(ws, row, 8, f"=IFERROR(E{row}*F{row},\"\")", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 8,
+                   f'=IF(OR(D{row}="",F{row}=""),"",E{row}*F{row})',
+                   fill=CALC_FILL, fmt="0.0")
         # V_TAS / delta-t  (y for regression: V/Δt = a·V⁴ + b)
-        style_cell(ws, row, 9, f"=IFERROR(G{row}/F{row},\"\")", fill=CALC_FILL, fmt="0.000")
+        style_cell(ws, row, 9,
+                   f'=IF(OR(D{row}="",F{row}=""),"",G{row}/F{row})',
+                   fill=CALC_FILL, fmt="0.000")
         # V_TAS^4 (x for regression)
-        style_cell(ws, row, 10, f"=IFERROR(G{row}^4,\"\")", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 10,
+                   f'=IF(OR(D{row}="",F{row}=""),"",G{row}^4)',
+                   fill=CALC_FILL, fmt="0.0")
 
     # === Curve Fit: V/Δt = a·V⁴ + b ===
     # From the drag polar: D = CD0·q·S + W²/(q·S·π·A·e)
@@ -355,6 +362,32 @@ def create_tab2_flight_tests(wb):
     style_cell(ws, r, 2, "=MAX(H32:H43)", fill=CALC_FILL, fmt="0.0")
     style_cell(ws, r, 3, "Sanity check: Vbg should be near the max row", border=False)
 
+    # Trendline endpoints (used by chart — two points define the fit line)
+    r = 59
+    style_cell(ws, r, 8, "Fit line:", font=BOLD, border=False)
+    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MIN(J32:J43)+B48,"")',
+               fill=CALC_FILL, fmt="0.000")
+    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MIN(J32:J43),"")',
+               fill=CALC_FILL, fmt="0.0")
+    r = 60
+    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MAX(J32:J43)+B48,"")',
+               fill=CALC_FILL, fmt="0.000")
+    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MAX(J32:J43),"")',
+               fill=CALC_FILL, fmt="0.0")
+
+    # Trendline endpoints (two points define the fit line for the chart)
+    r = 59
+    style_cell(ws, r, 8, "Fit line:", font=BOLD, border=False)
+    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MIN(J32:J43)+B48,"")',
+               fill=CALC_FILL, fmt="0.000")
+    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MIN(J32:J43),"")',
+               fill=CALC_FILL, fmt="0.0")
+    r = 60
+    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MAX(J32:J43)+B48,"")',
+               fill=CALC_FILL, fmt="0.000")
+    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MAX(J32:J43),"")',
+               fill=CALC_FILL, fmt="0.0")
+
     # === CLIMB TEST DATA (validation) ===
     r = 62
     style_cell(ws, r, 1, "CLIMB TEST RUNS (Validation)", font=SECTION_FONT, border=False)
@@ -366,17 +399,19 @@ def create_tab2_flight_tests(wb):
     for i, h in enumerate(climb_headers):
         style_cell(ws, r, i + 1, h, font=BOLD)
 
-    # 12 climb test rows
+    # 12 climb test rows (formulas return "" when input cells are empty)
     for run in range(1, 13):
         row = 63 + run
         style_cell(ws, row, 1, run)
         style_cell(ws, row, 2, None, fill=INPUT_FILL)  # Fuel gal
-        style_cell(ws, row, 3, f"=$B$23+$B$24+$B$25+B{row}*6", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 3, f'=IF(B{row}="","",$B$23+$B$24+$B$25+B{row}*6)',
+                   fill=CALC_FILL, fmt="0.0")
         style_cell(ws, row, 4, None, fill=INPUT_FILL)  # KIAS
-        style_cell(ws, row, 5, f"=D{row}+$B$28", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 5, f'=IF(D{row}="","",D{row}+$B$28)', fill=CALC_FILL, fmt="0.0")
         style_cell(ws, row, 6, None, fill=INPUT_FILL)  # delta-t
         # ROC = ΔH_tapeline / Δt * 60
-        style_cell(ws, row, 7, f"=$B$18/F{row}*60", fill=CALC_FILL, fmt="0.0")
+        style_cell(ws, row, 7, f'=IF(F{row}="","",IFERROR($B$18/F{row}*60,""))',
+                   fill=CALC_FILL, fmt="0.0")
         style_cell(ws, row, 8, None, fill=INPUT_FILL)  # RPM
         style_cell(ws, row, 9, None, fill=INPUT_FILL)  # % Power from Dynon
 
@@ -422,7 +457,7 @@ def create_tab2_flight_tests(wb):
         # Climb angle = DEGREES(ATAN(ROC / (V_TAS * 60)))
         # V_TAS = (KCAS / sqrt(sigma)) / 0.5924838
         style_cell(ws, row, 10,
-                   f"=IFERROR(DEGREES(ATAN(G{row}/(((E{row}/SQRT($B$19))/0.5924838)*60))),\"\")",
+                   f'=IF(OR(D{row}="",F{row}=""),"",IFERROR(DEGREES(ATAN(G{row}/(((E{row}/SQRT($B$19))/0.5924838)*60))),""))',
                    fill=CALC_FILL, fmt="0.00")
 
     r = 83
@@ -444,11 +479,14 @@ def create_tab2_flight_tests(wb):
     y_data = Reference(ws, min_col=9, min_row=32, max_row=43)   # V/Δt (col I)
     series1 = Series(y_data, x_data, title="Glide data")
     series1.graphicalProperties.line.noFill = True  # scatter, no line between points
-    tl = Trendline(trendlineType="linear", dispRSqr=True, dispEq=True)
-    tl.graphicalProperties = GraphicalProperties()
-    tl.graphicalProperties.line.solidFill = "FF0000"  # red trendline
-    series1.trendline = tl
     chart1.series.append(series1)
+
+    # Manual fit line (two endpoints computed from SLOPE/INTERCEPT)
+    x_fit = Reference(ws, min_col=10, min_row=59, max_row=60)  # V⁴ endpoints
+    y_fit = Reference(ws, min_col=9, min_row=59, max_row=60)   # predicted V/Δt
+    series_fit = Series(y_fit, x_fit, title="Linear fit (R² in B56)")
+    chart1.series.append(series_fit)
+
     ws.add_chart(chart1, "A86")
 
     # Chart 2: KCAS × Δt vs KCAS (intuitive view — peak = Vbg)
@@ -463,7 +501,7 @@ def create_tab2_flight_tests(wb):
     y_data2 = Reference(ws, min_col=8, min_row=32, max_row=43)  # KCAS×Δt (col H)
     series2 = Series(y_data2, x_data2, title="Glide data")
     chart2.series.append(series2)
-    ws.add_chart(chart2, "A102")
+    ws.add_chart(chart2, "A108")
 
     # Chart 3: Climb ROC vs KCAS
     chart3 = ScatterChart()
@@ -477,7 +515,7 @@ def create_tab2_flight_tests(wb):
     y_data3 = Reference(ws, min_col=7, min_row=64, max_row=75)  # ROC (col G)
     series3 = Series(y_data3, x_data3, title="Climb data")
     chart3.series.append(series3)
-    ws.add_chart(chart3, "A118")
+    ws.add_chart(chart3, "A130")
 
 
 def create_tab3_data_plate(wb):
