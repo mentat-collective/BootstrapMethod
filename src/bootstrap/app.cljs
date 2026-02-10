@@ -460,7 +460,8 @@
      [:li "John T. Lowry, "
       [:em "Performance of Light Aircraft"]
       " (AIAA, 1999) \u2014 "
-      [:a {:href "PerfOfLightAircraft.pdf" :target "_blank"} "PDF in this repository"]]
+      [:a {:href "https://github.com/mentat-collective/BootstrapMethod/blob/main/PerfOfLightAircraft.pdf"
+           :target "_blank" :rel "noopener"} "PDF (GitHub)"]]
      [:li "AvWeb: "
       [:a {:href "https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-performancepart-one-fixed-pitch-propeller-airplanes/"
            :target "_blank" :rel "noopener"}

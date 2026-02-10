@@ -1093,24 +1093,29 @@ def create_tab0_instructions(wb):
 
     r += 2
     style_cell(ws, r, 1, "References", font=SECTION_FONT, border=False)
+    BOOK_URL = ("https://github.com/mentat-collective/BootstrapMethod/"
+                "blob/main/PerfOfLightAircraft.pdf")
+    AVWEB_1 = ("https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-"
+               "performancepart-one-fixed-pitch-propeller-airplanes/")
+    AVWEB_2 = ("https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-"
+               "performancepart-two-constant-speed-propeller-airplanes/")
     refs = [
-        "John T. Lowry, Performance of Light Aircraft (AIAA, 1999) — see "
-        "PerfOfLightAircraft.pdf in this project's repository.",
-        "AvWeb: \"The Bootstrap Approach to Aircraft Performance — Part 1: "
-        "Fixed-Pitch Propeller Airplanes\"",
-        "  https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-"
-        "performancepart-one-fixed-pitch-propeller-airplanes/",
-        "AvWeb: \"The Bootstrap Approach to Aircraft Performance — Part 2: "
-        "Constant-Speed Propeller Airplanes\"",
-        "  https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-"
-        "performancepart-two-constant-speed-propeller-airplanes/",
+        ("John T. Lowry, Performance of Light Aircraft (AIAA, 1999):", None),
+        (f"  {BOOK_URL}", BOOK_URL),
+        ("AvWeb: \"The Bootstrap Approach — Part 1: "
+         "Fixed-Pitch Propeller Airplanes\":", None),
+        (f"  {AVWEB_1}", AVWEB_1),
+        ("AvWeb: \"The Bootstrap Approach — Part 2: "
+         "Constant-Speed Propeller Airplanes\":", None),
+        (f"  {AVWEB_2}", AVWEB_2),
     ]
-    for ref in refs:
+    for text, url in refs:
         r += 1
-        ws.cell(row=r, column=1).value = ref
-        ws.cell(row=r, column=1).alignment = Alignment(wrap_text=True)
-        if ref.startswith("  http"):
-            ws.cell(row=r, column=1).font = Font(color="0563C1", underline="single")
+        cell = ws.cell(row=r, column=1, value=text)
+        cell.alignment = Alignment(wrap_text=True)
+        if url:
+            cell.hyperlink = url
+            cell.font = Font(color="0563C1", underline="single")
         ws.row_dimensions[r].height = 30
 
     r += 2
