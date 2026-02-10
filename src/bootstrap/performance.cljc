@@ -93,7 +93,9 @@
 
 (def r182-data-plate
   "Cessna R182 N4697K data plate from bootstp2.xls for validation."
-  {:S        174.0    ; wing area, ft²
+  {:tail-number "N4697K"
+   :type        "Cessna R182"
+   :S        174.0    ; wing area, ft²
    :B        36.0     ; wing span, ft
    :P0       235.0    ; rated MSL power, hp
    :N0       2400     ; rated RPM

@@ -366,7 +366,8 @@
      [:div.header
       [:h1 "Bootstrap Performance Explorer"]
       [:span.aircraft
-       (str "S=" (:S dp) " B=" (:B dp)
+       [:strong (str (:tail-number dp) " — " (:type dp))]
+       (str "  S=" (:S dp) " B=" (:B dp)
             " P0=" (:P0 dp) "hp CD0=" (:CD0 dp)
             " e=" (:e dp))]]
 

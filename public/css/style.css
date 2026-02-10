@@ -1,0 +1,345 @@
+/* Bootstrap Performance Explorer */
+
+:root {
+  --bg: #f8f9fa;
+  --card-bg: #ffffff;
+  --border: #dee2e6;
+  --text: #212529;
+  --text-muted: #6c757d;
+  --primary: #2f5496;
+  --accent: #28a745;
+  --warning: #dc3545;
+  --slider-track: #dee2e6;
+  --slider-thumb: #2f5496;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* Layout */
+.app { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 2px solid var(--primary);
+  margin-bottom: 1rem;
+}
+
+.header h1 {
+  font-size: 1.25rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.header .aircraft {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Navigation tabs */
+.nav-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.nav-tab {
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+/* Slider controls */
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slider-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--slider-track);
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--slider-thumb);
+  cursor: pointer;
+}
+
+input[type="number"] {
+  width: 80px;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+/* Cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.card-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.v-speed {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.25rem 0;
+}
+
+.v-speed-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.v-speed-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.v-speed-unit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: 0.25rem;
+}
+
+.big-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+.big-number-unit {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Performance table */
+.perf-table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.perf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.perf-table th {
+  background: var(--primary);
+  color: white;
+  padding: 0.4rem 0.6rem;
+  text-align: right;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.perf-table th:first-child { text-align: left; }
+
+.perf-table td {
+  padding: 0.25rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.perf-table tr:nth-child(even) { background: #f8f9fa; }
+
+/* V-speed row highlighting — colors match chart series */
+.perf-table tr.vy-row  { background: #dce7f5; font-weight: 600; }  /* blue tint */
+.perf-table tr.vx-row  { background: #f8e0e3; font-weight: 600; }  /* red tint */
+.perf-table tr.vbg-row { background: #dcf5e2; font-weight: 600; }  /* green tint */
+.perf-table tr.vmd-row { background: #fef0e0; font-weight: 600; }  /* orange tint */
+.perf-table tr.vm-row  { background: #ede0f5; font-weight: 600; }  /* purple tint */
+
+.perf-table .vspeed-label {
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+.perf-table tr.vy-row  .vspeed-label { color: #2f5496; }
+.perf-table tr.vx-row  .vspeed-label { color: #dc3545; }
+.perf-table tr.vbg-row .vspeed-label { color: #28a745; }
+.perf-table tr.vmd-row .vspeed-label { color: #fd7e14; }
+.perf-table tr.vm-row  .vspeed-label { color: #6f42c1; }
+
+/* Charts */
+.chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.chart-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
+}
+
+svg text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Contour plot */
+.contour-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.legend-bar {
+  height: 12px;
+  flex: 1;
+  border-radius: 2px;
+}
+
+/* Glide table */
+.glide-table {
+  width: auto;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.glide-table th, .glide-table td {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  text-align: right;
+}
+
+.glide-table th {
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+/* Print button */
+.print-btn {
+  padding: 0.5rem 1.25rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.print-btn:hover { opacity: 0.9; }
+
+/* Print styles */
+@media print {
+  .controls, .nav-tabs, .print-btn, .header .aircraft { display: none; }
+
+  .app { max-width: none; padding: 0; }
+
+  .header {
+    border-bottom: 1px solid #000;
+    margin-bottom: 0.5rem;
+  }
+
+  .card, .chart-container {
+    border: 1px solid #ccc;
+    break-inside: avoid;
+  }
+
+  .perf-table th {
+    background: #333;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body { font-size: 10pt; }
+}

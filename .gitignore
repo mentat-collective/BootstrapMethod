@@ -15,4 +15,4 @@ wheels/
 .lsp
 node_modules/
 .shadow-cljs
-public
+public/js/
