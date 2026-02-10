@@ -1,8 +1,9 @@
-"""Generate the Bootstrap Method Google Sheet (.xlsx) with 3 tabs.
+"""Generate the Bootstrap Method Google Sheet (.xlsx) with 4 tabs.
 
 Tab 1: Propeller Blade Measurements → TAF
 Tab 2: Glide & Climb Flight Tests → CD0, e
 Tab 3: Bootstrap Data Plate Summary
+Tab 4: Performance Calculator (full Bootstrap Method computation)
 
 Upload the resulting .xlsx to Google Sheets.
 """
@@ -564,11 +565,445 @@ def create_tab3_data_plate(wb):
         r += 1
 
 
+def create_tab4_performance(wb):
+    """Tab 4: Performance Calculator — full Bootstrap Method computation.
+
+    Takes a data plate (9 aircraft params + config) and operational variables
+    (W, h, N, %power), then computes a full performance table via the GAGPC
+    propeller efficiency model. Pre-filled with R182 validation data.
+    """
+    ws = wb.create_sheet("Performance Calculator")
+
+    # ----- Column widths -----
+    ws.column_dimensions["A"].width = 26
+    ws.column_dimensions["B"].width = 14
+    for col_letter in "CDEFGHIJKLMNOPQ":
+        ws.column_dimensions[col_letter].width = 13
+
+    # Performance table geometry
+    TBL_HDR = 94       # header row
+    TBL_START = 95     # first data row (KCAS = 60.0)
+    TBL_END = 255      # last data row  (KCAS = 140.0)
+    # 161 rows total: (140 - 60) / 0.5 + 1
+
+    # =====================================================================
+    # Section 1: GAGPC Polynomial Coefficients (rows 1-12)
+    # =====================================================================
+    ws.merge_cells("A1:Q1")
+    style_cell(ws, 1, 1, "Performance Calculator \u2014 Bootstrap Method",
+               font=TITLE_FONT, border=False)
+    ws.merge_cells("A2:Q2")
+    style_cell(ws, 2, 1,
+               "Yellow = inputs. Blue = computed. Green = results. "
+               "Change data plate and operational variables to recompute.",
+               border=False)
+
+    style_cell(ws, 4, 1, "GAGPC Polynomial Coefficients",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 4, 6, "(8 columns \u00d7 7 coefficients \u2014 "
+               "Boeing/Uddenberg propeller data)", border=False)
+
+    # CPX breakpoints in row 5, columns C-J
+    cpx_breakpoints = [0.15, 0.25, 0.40, 0.60, 0.80, 1.00, 1.20, 1.40]
+    style_cell(ws, 5, 1, "CPX \u2192", font=BOLD)
+    for i, cpx in enumerate(cpx_breakpoints):
+        style_cell(ws, 5, 3 + i, cpx, fill=CALC_FILL, fmt="0.00")
+
+    # GAGPC coefficients: 8 columns (one per CPX) x 7 rows (c0-c6).
+    # gagpc[col_idx] = [c0, c1, ..., c6] for that CPX breakpoint.
+    gagpc = [
+        [-0.027280541925,  1.157818942224, -0.548923123013,  0.038551650269,  0.064580555280, -0.026301243311,  0.003017419881],
+        [-0.038502996895,  1.046135815788, -0.485313329667,  0.130100232509, -0.027326610124,  0.003139013961, -0.000131566345],
+        [-0.026741905000,  0.717582413500, -0.084673350000, -0.074451680000,  0.026437051000, -0.003537565000,  0.000177733000],
+        [ 0.038100252152,  0.199522455590,  0.458898025445, -0.318992736679,  0.081357821405, -0.009083801712,  0.000350613126],
+        [ 0.251897476000, -0.561665840000,  1.139055130000, -0.602193330000,  0.144341736000, -0.016194730000,  0.000664038000],
+        [ 0.140144145675,  0.071636129794, -0.057356417627,  0.276378945894, -0.159843307011,  0.034239846258, -0.002573002786],
+        [-0.705604050000,  2.868232531000, -3.651371295000,  2.487262933000, -0.863421200000,  0.146478331500, -0.009686855000],
+        [-2.340532183939,  7.563937897150, -9.020964992475,  5.550045133294, -1.793776917489,  0.291020480454, -0.018743169313],
+    ]
+    coeff_labels = [
+        ("c0", "(constant)"), ("c1", "(h)"), ("c2", "(h\u00b2)"),
+        ("c3", "(h\u00b3)"), ("c4", "(h\u2074)"),
+        ("c5", "(h\u2075)"), ("c6", "(h\u2076)"),
+    ]
+    for ci in range(7):
+        row = 6 + ci
+        style_cell(ws, row, 1, coeff_labels[ci][0], font=BOLD)
+        style_cell(ws, row, 2, coeff_labels[ci][1])
+        for col_idx in range(8):
+            style_cell(ws, row, 3 + col_idx, gagpc[col_idx][ci],
+                       fill=CALC_FILL, fmt="0.000000000000")
+
+    # =====================================================================
+    # Section 2: SDF Coefficients (rows 14-16)
+    # =====================================================================
+    style_cell(ws, 14, 1, "Slow-Down Factor (SDF) Coefficients",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 14, 6, "Cubic polynomial in Z (Lowry Eq. 6.58/6.59)",
+               border=False)
+
+    style_cell(ws, 15, 1, "Tractor:", font=BOLD)
+    for i, c in enumerate([1.05263, -0.00722, -0.16462, -0.18341]):
+        style_cell(ws, 15, 2 + i, c, fill=CALC_FILL, fmt="0.00000")
+
+    style_cell(ws, 16, 1, "Pusher:", font=BOLD)
+    for i, c in enumerate([1.05263, -0.04185, -0.01481, -0.62001]):
+        style_cell(ws, 16, 2 + i, c, fill=CALC_FILL, fmt="0.00000")
+
+    # =====================================================================
+    # Section 3: Aircraft Data Plate + Operational Variables (rows 18-36)
+    #
+    # Pre-filled with R182 validation data (Cessna R182 N4697K from
+    # bootstp2.xls). Replace with your aircraft's values.
+    # =====================================================================
+    style_cell(ws, 18, 1, "Aircraft Data Plate",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 18, 4, "(R182 defaults \u2014 replace with your values)",
+               border=False)
+
+    # Data plate: (row, default_value, label, units, fmt)
+    # Row mapping:  S=B19, B=B20, P0=B21, N0=B22, d=B23,
+    #               CD0=B24, e=B25, TAF=B26, Z=B27,
+    #               Tractor?=B28, BB=B29, C=B30
+    dp_params = [
+        (19, 174.0,   "S (wing area)",          "ft\u00b2", "0.0"),
+        (20, 36.0,    "B (wing span)",           "ft",       "0.0"),
+        (21, 235.0,   "P0 (rated power)",        "hp",       "0.0"),
+        (22, 2400,    "N0 (rated RPM)",          "RPM",      "0"),
+        (23, 6.83,    "d (prop diameter)",        "ft",       "0.000"),
+        (24, 0.02874, "CD0",                      "",         "0.00000"),
+        (25, 0.72,    "e",                         "",         "0.000"),
+        (26, 195.9,   "TAF",                       "",         "0.0"),
+        (27, 0.688,   "Z (fuse dia / prop dia)",   "",         "0.000"),
+        (28, 1,       "Tractor? (1=yes, 0=no)",    "",         "0"),
+        (29, 2,       "BB (num blades)",            "",         "0"),
+        (30, 0.12,    "C (power dropoff)",          "",         "0.00"),
+    ]
+    for row, default, label, units, fmt in dp_params:
+        style_cell(ws, row, 1, label, font=BOLD)
+        style_cell(ws, row, 2, default, fill=INPUT_FILL, fmt=fmt)
+        if units:
+            style_cell(ws, row, 3, units, border=False)
+
+    # Operational variables
+    style_cell(ws, 32, 1, "Operational Variables",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 32, 4, "(change these to explore different conditions)",
+               border=False)
+
+    # W=B33, h=B34, N=B35, %Power=B36
+    ops = [
+        (33, 3100.0, "W (gross weight)",  "lbs", "0.0"),
+        (34, 8000,   "h (density alt)",   "ft",  "0"),
+        (35, 2300,   "N (RPM)",           "",     "0"),
+        (36, 0.65,   "% Power (0\u20131)", "",    "0.00"),
+    ]
+    for row, default, label, units, fmt in ops:
+        style_cell(ws, row, 1, label, font=BOLD)
+        style_cell(ws, row, 2, default, fill=INPUT_FILL, fmt=fmt)
+        if units:
+            style_cell(ws, row, 3, units, border=False)
+
+    # =====================================================================
+    # Section 4: Computed Constants (rows 38-52)
+    # =====================================================================
+    style_cell(ws, 38, 1, "Computed Constants",
+               font=SECTION_FONT, border=False)
+
+    cc = [
+        (39, "\u03c3 (density ratio)",
+         "=(1-0.003566*B34/518.7)^(1/0.234957)",
+         "0.0000", "(1 - lapse\u00b7h/T\u2080)^(1/0.235)"),
+        (40, "\u03c1 (slug/ft\u00b3)",
+         "=0.002377*B39",
+         "0.000000", ""),
+        (41, "\u03c6 (power lapse)",
+         "=(B39-B30)/(1-B30)",
+         "0.0000", "Gagg-Ferrar: (\u03c3 - C)/(1 - C)"),
+        (42, "X (power adj. factor)",
+         "=0.001515*B26-0.0880",
+         "0.0000", "Eq 6.57"),
+        (43, "A (aspect ratio)",
+         "=B20^2/B19",
+         "0.000", "B\u00b2 / S"),
+        (44, "SDF",
+         "=IF(B28=1,"
+         "B15+C15*B27+D15*B27^2+E15*B27^3,"
+         "B16+C16*B27+D16*B27^2+E16*B27^3)",
+         "0.000", "Eq 6.58/6.59"),
+        (45, "P (ft\u00b7lbf/s)",
+         "=B36*B21*550",
+         "0.0", "%power \u00d7 P\u2080 \u00d7 550"),
+        (46, "n (rev/s)",
+         "=B35/60",
+         "0.000", "N / 60"),
+        (47, "CP (power coeff.)",
+         "=B45/(B40*B46^3*B23^5)",
+         "0.00000", "P / (\u03c1\u00b7n\u00b3\u00b7d\u2075)"),
+        (48, "CPX",
+         "=MIN(MAX(B47/B42,0.15),1.40)",
+         "0.0000", "CP / X (clamped to GAGPC range)"),
+        (49, "GAGPC bracket idx",
+         "=MIN(MATCH(B48,$C$5:$J$5,1),7)",
+         "0", "MATCH position in CPX breakpoints"),
+        (50, "CPX lower",
+         "=INDEX($C$5:$J$5,1,B49)",
+         "0.00", ""),
+        (51, "CPX upper",
+         "=INDEX($C$5:$J$5,1,B49+1)",
+         "0.00", ""),
+        (52, "Interp. fraction",
+         "=(B48-B50)/(B51-B50)",
+         "0.0000", "(CPX - CPX_lo) / (CPX_hi - CPX_lo)"),
+    ]
+    for row, label, formula, fmt, note in cc:
+        style_cell(ws, row, 1, label, font=BOLD)
+        style_cell(ws, row, 2, formula, fill=CALC_FILL, fmt=fmt)
+        if note:
+            style_cell(ws, row, 3, note, border=False)
+
+    # =====================================================================
+    # Section 5: Optimum V-Speeds (rows 54-59)
+    #
+    # Performance table columns: A=KCAS, N=ROC, O=AOC, P=ROS, Q=AOG
+    # =====================================================================
+    style_cell(ws, 54, 1, "Optimum V-Speeds",
+               font=SECTION_FONT, border=False)
+
+    ts, te = TBL_START, TBL_END
+    vspeeds = [
+        # (row, label, kcas_formula, unit1, val_formula, unit2)
+        (55, "Vy (best ROC):",
+         f"=INDEX(A{ts}:A{te},MATCH(MAX(N{ts}:N{te}),N{ts}:N{te},0))",
+         "KCAS", f"=MAX(N{ts}:N{te})", "ft/min"),
+        (56, "Vx (best AOC):",
+         f"=INDEX(A{ts}:A{te},MATCH(MAX(O{ts}:O{te}),O{ts}:O{te},0))",
+         "KCAS", f"=MAX(O{ts}:O{te})", "degrees"),
+        (57, "Vbg (best glide):",
+         f"=INDEX(A{ts}:A{te},MATCH(MIN(Q{ts}:Q{te}),Q{ts}:Q{te},0))",
+         "KCAS", f"=MIN(Q{ts}:Q{te})", "degrees"),
+        (58, "Vmd (min sink):",
+         f"=INDEX(A{ts}:A{te},MATCH(MIN(P{ts}:P{te}),P{ts}:P{te},0))",
+         "KCAS", f"=MIN(P{ts}:P{te})", "ft/min"),
+        (59, "VM (max level):",
+         f'=MAXIFS(A{ts}:A{te},N{ts}:N{te},">0")',
+         "KCAS", None, None),
+    ]
+    for row, label, kcas_f, u1, val_f, u2 in vspeeds:
+        style_cell(ws, row, 1, label, font=BOLD)
+        style_cell(ws, row, 2, kcas_f, fill=RESULT_FILL, fmt="0.0")
+        style_cell(ws, row, 3, u1, font=BOLD)
+        if val_f:
+            style_cell(ws, row, 4, val_f, fill=RESULT_FILL,
+                       fmt="0.0" if "ft/min" == u2 else "0.00")
+            style_cell(ws, row, 5, u2)
+
+    # =====================================================================
+    # Section 6: Three-Way Validation (rows 61-91)
+    #
+    # Expected values from bootstp2.xls AND Clojure performance_test.clj.
+    # =====================================================================
+    style_cell(ws, 61, 1,
+               "Validation: Spreadsheet vs Clojure vs bootstp2.xls",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 62, 1,
+               "R182 at W=3100, h=8000, N=2300, 65% power",
+               border=False)
+
+    # Column headers
+    for ci, hdr in enumerate(["Item", "Expected", "Computed", "Delta"], 1):
+        style_cell(ws, 63, ci, hdr, font=BOLD)
+
+    def val_row(row, name, expected, computed, fmt):
+        style_cell(ws, row, 1, name)
+        style_cell(ws, row, 2, expected, fmt=fmt)
+        style_cell(ws, row, 3, computed, fill=CALC_FILL, fmt=fmt)
+        style_cell(ws, row, 4, f"=ABS(C{row}-B{row})", fill=CALC_FILL, fmt=fmt)
+
+    # Part A: Constants
+    val_row(64, "\u03c3",    0.786,    "=B39", "0.0000")
+    val_row(65, "\u03c1",    0.001868, "=B40", "0.000000")
+    val_row(66, "\u03c6",    0.7568,   "=B41", "0.0000")
+    val_row(67, "X",         0.2088,   "=B42", "0.0000")
+    val_row(68, "SDF",       0.910,    "=B44", "0.000")
+
+    # Part B: Performance at 60 KCAS
+    style_cell(ws, 70, 1, "Performance at 60 KCAS",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 70, 3, "(bootstp2.xls row 101)", border=False)
+
+    # Column map: H=eta, I=Thrust, K=Dp, L=Di, M=Drag, N=ROC, P=ROS, Q=AOG
+    def idx60(col):
+        return f"=INDEX({col}{ts}:{col}{te},MATCH(60,A{ts}:A{te},0))"
+
+    val_row(71, "\u03b7 (eta)",  0.617,   idx60("H"), "0.000")
+    val_row(72, "Thrust",        453.50,  idx60("I"), "0.00")
+    val_row(73, "Dp",            60.95,   idx60("K"), "0.00")
+    val_row(74, "Di",            268.96,  idx60("L"), "0.00")
+    val_row(75, "Drag",          329.91,  idx60("M"), "0.00")
+    val_row(76, "ROC",           273.23,  idx60("N"), "0.0")
+    val_row(77, "ROS",           729.37,  idx60("P"), "0.0")
+    val_row(78, "AOG",           6.109,   idx60("Q"), "0.000")
+
+    # Part C: V-Speed comparison
+    style_cell(ws, 80, 1, "V-Speed Comparison",
+               font=SECTION_FONT, border=False)
+    val_row(81, "Vy KCAS",  77.0,  "=B55", "0.0")
+    val_row(82, "Vy ROC",   371.7, "=D55", "0.0")
+    val_row(83, "Vx KCAS",  69.5,  "=B56", "0.0")
+    val_row(84, "Vx AOC",   2.55,  "=D56", "0.00")
+    val_row(85, "Vbg KCAS", 87.0,  "=B57", "0.0")
+    val_row(86, "Vbg AOG",  4.74,  "=D57", "0.00")
+    val_row(87, "Vmd KCAS", 66.0,  "=B58", "0.0")
+    val_row(88, "Vmd ROS",  719.9, "=D58", "0.0")
+    val_row(89, "VM KCAS",  111.5, "=B59", "0.0")
+
+    style_cell(ws, 91, 1,
+               "Deltas < 0.5 for KCAS (0.5 kt resolution), < 1% for others",
+               border=False)
+
+    # =====================================================================
+    # Section 7: Performance Table (rows 93-255)
+    #
+    # Columns: A=KCAS, B=KTAS, C=V_fps, D=J, E=h, F=eta_lo, G=eta_hi,
+    #          H=eta, I=Thrust, J=q, K=Dp, L=Di, M=Drag,
+    #          N=ROC, O=AOC, P=ROS, Q=AOG
+    # =====================================================================
+    style_cell(ws, 93, 1, "Performance Table",
+               font=SECTION_FONT, border=False)
+    style_cell(ws, 93, 5,
+               "KCAS 60\u2013140 (step 0.5) at current conditions",
+               border=False)
+
+    headers = [
+        "KCAS", "KTAS", "V_fps", "J", "h",
+        "\u03b7_lo", "\u03b7_hi", "\u03b7",
+        "Thrust", "q", "Dp", "Di", "Drag",
+        "ROC", "AOC", "ROS", "AOG",
+    ]
+    for i, hdr in enumerate(headers):
+        style_cell(ws, TBL_HDR, 1 + i, hdr, font=BOLD)
+
+    # Column format map (1-indexed column to number format)
+    col_fmts = {
+        1: "0.0",      # KCAS
+        2: "0.0",      # KTAS
+        3: "0.00",     # V_fps
+        4: "0.000",    # J
+        5: "0.000",    # h
+        6: "0.0000",   # eta_lo
+        7: "0.0000",   # eta_hi
+        8: "0.000",    # eta
+        9: "0.0",      # Thrust
+        10: "0.00",    # q
+        11: "0.00",    # Dp
+        12: "0.00",    # Di
+        13: "0.0",     # Drag
+        14: "0.0",     # ROC
+        15: "0.00",    # AOC
+        16: "0.0",     # ROS
+        17: "0.00",    # AOG
+    }
+
+    # --- Helper: Horner polynomial formula for GAGPC ---
+    def horner(row, idx_offset):
+        """Build Horner's method formula for GAGPC polynomial evaluation.
+
+        GAGPC coefficients: $C$6:$J$12 (c0 in row 6, c6 in row 12).
+        Bracket index: $B$49 (from MATCH on CPX breakpoints).
+        h (speed-power coefficient): column E of the given row.
+
+        Horner form: c0 + h*(c1 + h*(c2 + h*(c3 + h*(c4 + h*(c5 + h*c6)))))
+        """
+        h = f"E{row}"
+        idx = "$B$49" if idx_offset == 0 else "$B$49+1"
+
+        # Build from c6 (row 12) inward to c1 (row 7)
+        result = f"INDEX($C$12:$J$12,1,{idx})"  # c6
+        for cr in range(11, 6, -1):  # c5 (row 11) down to c1 (row 7)
+            result = f"INDEX($C${cr}:$J${cr},1,{idx})+{h}*({result})"
+        # Final outer wrap: c0 (row 6) + h*(c1 + ...)
+        result = f"INDEX($C$6:$J$6,1,{idx})+{h}*({result})"
+        return f"={result}"
+
+    # --- Generate 161 data rows ---
+    for i in range(161):
+        row = TBL_START + i
+        kcas = 60.0 + i * 0.5
+
+        formulas = {
+            1: kcas,                                            # KCAS
+            2: f"=A{row}/SQRT($B$39)",                         # KTAS
+            3: f"=B{row}/0.5924838",                           # V_fps
+            4: f"=C{row}/($B$46*$B$23)",                       # J
+            5: f"=D{row}/$B$47^(1/3)",                         # h
+            6: horner(row, 0),                                  # eta_lo
+            7: horner(row, 1),                                  # eta_hi
+            8: f"=$B$44*(F{row}+$B$52*(G{row}-F{row}))",       # eta
+            9: f"=H{row}*$B$45/C{row}",                        # Thrust
+            10: f"=0.5*$B$40*C{row}^2",                        # q
+            11: f"=$B$24*J{row}*$B$19",                         # Dp
+            12: f"=$B$33^2/(J{row}*$B$19*PI()*$B$43*$B$25)",   # Di
+            13: f"=K{row}+L{row}",                              # Drag
+            14: f"=(I{row}-M{row})*C{row}/$B$33*60",           # ROC
+            15: f"=DEGREES(ASIN(MIN(1,MAX(-1,"                  # AOC
+                f"(I{row}-M{row})/$B$33))))",
+            16: f"=M{row}*C{row}/$B$33*60",                    # ROS
+            17: f"=DEGREES(ASIN(MIN(1,MAX(-1,"                  # AOG
+                f"M{row}/$B$33))))",
+        }
+
+        for col in range(1, 18):
+            val = formulas[col]
+            fill = None if col == 1 else CALC_FILL
+            style_cell(ws, row, col, val, fill=fill, fmt=col_fmts[col])
+
+    # =====================================================================
+    # Section 8: Charts (after the performance table)
+    # =====================================================================
+
+    chart_row = TBL_END + 2  # row 257
+
+    # Chart 1: Thrust & Drag vs Airspeed
+    chart1 = ScatterChart()
+    chart1.title = "Thrust & Drag vs Airspeed"
+    chart1.x_axis.title = "KCAS"
+    chart1.y_axis.title = "Force (lbf)"
+    chart1.width = 20
+    chart1.height = 14
+    chart1.style = 2
+
+    x_data = Reference(ws, min_col=1, min_row=TBL_START, max_row=TBL_END)
+    thrust_ref = Reference(ws, min_col=9, min_row=TBL_START, max_row=TBL_END)
+    drag_ref = Reference(ws, min_col=13, min_row=TBL_START, max_row=TBL_END)
+
+    s_thrust = Series(thrust_ref, x_data, title="Thrust")
+    s_drag = Series(drag_ref, x_data, title="Drag")
+    chart1.series.append(s_thrust)
+    chart1.series.append(s_drag)
+    ws.add_chart(chart1, f"A{chart_row}")
+
+    # Chart 2: Rate of Climb vs Airspeed
+    chart2 = ScatterChart()
+    chart2.title = "Rate of Climb vs Airspeed"
+    chart2.x_axis.title = "KCAS"
+    chart2.y_axis.title = "ROC (ft/min)"
+    chart2.width = 20
+    chart2.height = 14
+    chart2.style = 2
+
+    roc_ref = Reference(ws, min_col=14, min_row=TBL_START, max_row=TBL_END)
+    s_roc = Series(roc_ref, x_data, title="ROC")
+    chart2.series.append(s_roc)
+    ws.add_chart(chart2, f"J{chart_row}")
+
+
 def main():
     wb = openpyxl.Workbook()
     create_tab1_propeller(wb)
     create_tab2_flight_tests(wb)
     create_tab3_data_plate(wb)
+    create_tab4_performance(wb)
 
     out = "/Users/sritchie/Dropbox/N720AK/BootstrapMethod/bootstrap_method.xlsx"
     wb.save(out)

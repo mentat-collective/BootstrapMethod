@@ -16,6 +16,8 @@
            :h 8000
            :N 2300
            :pct-power 0.65
+           :V-min 45       ; lower bound for performance table (covers low-weight V-speeds)
+           :V-max 140      ; upper bound (increase for faster aircraft, e.g. RV-10: 180)
            :view :dashboard}))
 
 ;; =============================================================================
@@ -63,7 +65,8 @@
    :pct-power (:pct-power @state)})
 
 (defn compute-table []
-  (perf/performance-table (:data-plate @state) (current-ops) {:step 1.0}))
+  (perf/performance-table (:data-plate @state) (current-ops)
+                          {:from (:V-min @state) :to (:V-max @state) :step 1.0}))
 
 (defn compute-optimums []
   (perf/optimum-speeds (compute-table)))
@@ -149,7 +152,7 @@
                  {:label (str w " lbs")
                   :data (vec (for [alt altitudes]
                                (let [ops {:W (double w) :h alt :N N :pct-power pct-power}
-                                     table (perf/performance-table dp ops {:from 60 :to 140 :step 2})
+                                     table (perf/performance-table dp ops {:from (:V-min @state) :to (:V-max @state) :step 2})
                                      opts (perf/optimum-speeds table)]
                                  [alt (get-in opts [:Vy :ROC])])))})]
     [:div.chart-container
@@ -169,7 +172,7 @@
         weights (range 1800 3101 50)
         speed-data (vec (for [w weights]
                           (let [ops {:W (double w) :h h :N N :pct-power pct-power}
-                                table (perf/performance-table dp ops {:from 60 :to 140 :step 1})
+                                table (perf/performance-table dp ops {:from (:V-min @state) :to (:V-max @state) :step 1})
                                 opts (perf/optimum-speeds table)]
                             {:w w :opts opts})))
         make-series (fn [key sub-key label]
@@ -217,7 +220,7 @@
       {:width 700 :height 400
        :x-label "Calibrated Airspeed (KCAS)"
        :y-label "Force (lbs)"
-       :x-domain [60 140]
+       :x-domain [(:V-min @state) (:V-max @state)]
        :y-domain [0 (+ 50 (apply max all-forces))]
        :series (vec series)
        :markers (vec markers)}]]))
@@ -228,7 +231,7 @@
         weights [2000 2200 2400 2600 2800 3000 3100]
         rows (vec (for [w weights]
                     (let [ops {:W (double w) :h h :N N :pct-power pct-power}
-                          table (perf/performance-table dp ops {:from 55 :to 140 :step 1})
+                          table (perf/performance-table dp ops {:from (:V-min @state) :to (:V-max @state) :step 1})
                           opts (perf/optimum-speeds table)
                           vbg-kcas (get-in opts [:Vbg :KCAS])
                           atm (perf/atmosphere h (:C dp))
@@ -282,7 +285,7 @@
                       (vec (for [xi (range nx)]
                              (let [w (+ w-min (* (+ xi 0.5) w-step))
                                    ops {:W w :h alt :N N :pct-power pct-power}
-                                   table (perf/performance-table dp ops {:from 60 :to 140 :step 3})
+                                   table (perf/performance-table dp ops {:from (:V-min @state) :to (:V-max @state) :step 3})
                                    opts (perf/optimum-speeds table)]
                                (max 0 (get-in opts [:Vy :ROC] 0))))))))
         v-max (apply max (mapcat identity grid))]
@@ -307,16 +310,27 @@
 ;; Performance table view
 ;; =============================================================================
 
+(defn- vspeed-for
+  "Return {:label \"Vy\" :class \"vy-row\"} if kcas is within 0.5 of a V-speed, else nil."
+  [opts kcas]
+  (first
+   (keep (fn [[key info]]
+           (when-let [s (get-in opts [key :KCAS])]
+             (when (<= (js/Math.abs (- kcas s)) 0.5)
+               info)))
+         [[:Vy  {:label "Vy"  :class "vy-row"}]
+          [:Vx  {:label "Vx"  :class "vx-row"}]
+          [:Vbg {:label "Vbg" :class "vbg-row"}]
+          [:Vmd {:label "Vmd" :class "vmd-row"}]
+          [:VM  {:label "VM"  :class "vm-row"}]])))
+
 (defn table-view []
   (let [table (compute-table)
         opts (compute-optimums)
-        opt-speeds (set (remove nil? [(get-in opts [:Vy :KCAS])
-                                      (get-in opts [:Vx :KCAS])
-                                      (get-in opts [:Vbg :KCAS])
-                                      (get-in opts [:Vmd :KCAS])
-                                      (get-in opts [:VM :KCAS])]))
-        ;; Show every 2 KCAS for readability
-        filtered (filter (fn [r] (zero? (mod (int (:KCAS r)) 2))) table)]
+        ;; Show every 2 KCAS, plus any V-speed rows (which may land on odd values)
+        filtered (filter (fn [r] (or (zero? (mod (int (:KCAS r)) 2))
+                                     (vspeed-for opts (:KCAS r))))
+                         table)]
     [:div
      [:button.print-btn {:on-click #(js/window.print)} "Print Table"]
      [:div.perf-table-wrapper
@@ -324,12 +338,12 @@
        [:thead
         [:tr
          [:th "KCAS"] [:th "KTAS"] [:th "\u03B7"] [:th "Thrust"] [:th "Drag"]
-         [:th "ROC"] [:th "AOC"] [:th "ROS"] [:th "AOG"]]]
+         [:th "ROC"] [:th "AOC"] [:th "ROS"] [:th "AOG"] [:th ""]]]
        [:tbody
         (for [row filtered]
-          (let [highlight? (some #(< (js/Math.abs (- (:KCAS row) %)) 1.0) opt-speeds)]
+          (let [vs (vspeed-for opts (:KCAS row))]
             ^{:key (:KCAS row)}
-            [:tr {:class (when highlight? "highlight")}
+            [:tr {:class (:class vs)}
              [:td (charts/format-num (:KCAS row) 1)]
              [:td (charts/format-num (:KTAS row) 1)]
              [:td (charts/format-num (:eta row) 3)]
@@ -338,7 +352,8 @@
              [:td (charts/format-num (:ROC row) 1)]
              [:td (charts/format-num (:AOC row) 2)]
              [:td (charts/format-num (:ROS row) 1)]
-             [:td (charts/format-num (:AOG row) 2)]]))]]]]))
+             [:td (charts/format-num (:AOG row) 2)]
+             [:td.vspeed-label (:label vs)]]))]]]]))
 
 ;; =============================================================================
 ;; App root

@@ -9,7 +9,11 @@
       "Bash(pdftotext:*)",
       "Bash(clj:*)",
       "Bash(python create_sheet.py:*)",
-      "Bash(npx shadow-cljs:*)"
+      "Bash(npx shadow-cljs:*)",
+      "Bash(ls:*)",
+      "Bash(/tmp/extract_bootstp2c.py:*)",
+      "Bash(/tmp/extract_gagpc.py:*)",
+      "Bash(/tmp/bootstrap_verify.py:*)"
     ]
   }
 }

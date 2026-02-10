@@ -80,7 +80,7 @@
     (let [{:keys [sigma rho]} (perf/atmosphere 8000 0.12)
           P-ftlbfs (* 0.65 235.0 550.0)
           n-rps    (/ 2300.0 60.0)
-          d        6.833
+          d        6.83
           ktas     (/ 60.0 (Math/sqrt sigma))
           V-fps    (* ktas perf/kt->fps)
           prop     (perf/propeller-efficiency perf/r182-data-plate rho V-fps n-rps d P-ftlbfs)]
