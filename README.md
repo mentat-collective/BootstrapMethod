@@ -25,13 +25,35 @@ variables (weight, altitude, RPM, power setting), the calculator produces:
 - Thrust, parasite drag, and induced drag
 - Rate of climb and climb angle (powered)
 - Rate of sink and glide angle (unpowered)
-- Optimum V-speeds: Vy, Vx, Vbg, Vmd, VM
+- Optimum V-speeds: Vy, Vx, Vbg, Vmd, VM (see definitions below)
+
+## V-Speed Reference
+
+The calculator finds five optimum speeds. Each answers a different operational
+question:
+
+| Speed | Name | What It Optimizes | When You Use It |
+|-------|------|-------------------|-----------------|
+| **Vy** | Best rate of climb | Max altitude gained per minute (max ROC) | Normal climbs — get to cruise altitude efficiently |
+| **Vx** | Best angle of climb | Max altitude gained per distance (max AOC) | Obstacle clearance after takeoff, short field departures |
+| **Vbg** | Best glide | Max distance per altitude lost (max L/D) | Engine failure — stretch the glide to reach a landing site |
+| **Vmd** | Minimum descent | Min altitude lost per minute (min ROS) | Stay aloft longest in a glide — circle near a field, wait for help |
+| **VM** | Max level flight | Highest speed where thrust = drag | Practical top speed at current power setting and altitude |
+
+Key relationships:
+- **Vmd < Vbg**: Vmd is always slower. Vmd minimizes *time* descending; Vbg
+  minimizes *distance* descending. At Vbg, parasite drag equals induced drag
+  (Dp = Di).
+- **Vx < Vy < VM**: In a climb, Vx gives the steepest path, Vy the fastest
+  altitude gain, and VM is where excess thrust runs out.
+- All V-speeds vary with weight (heavier = faster) and altitude (higher = faster
+  in TAS, but KCAS changes more subtly through propeller efficiency effects).
 
 ## Project Components
 
 ### Clojure Performance Calculator
 
-The core computation engine in `src/bootstrap/performance.clj`. Takes a data plate
+The core computation engine in `src/bootstrap/performance.cljc`. Takes a data plate
 map and operational variables, sweeps across airspeeds, and returns a performance table.
 
 ```clojure
@@ -53,6 +75,49 @@ map and operational variables, sweeps across airspeeds, and returns a performanc
 (p/print-optimums (p/optimum-speeds table))
 ```
 
+### Interactive Web App
+
+A browser-based performance explorer built with Reagent (ClojureScript + React).
+The same performance calculator that runs in the JVM test suite runs directly in
+your browser — every slider change recomputes the full physics model instantly.
+
+```bash
+npm install                    # first time only
+npx shadow-cljs watch app     # dev server at http://localhost:8280
+```
+
+The app has four views:
+
+**Dashboard** — The pre-flight view. Shows the five V-speeds as large cards plus
+max rate of climb, best glide ratio (L/D and nautical miles per 1000 ft lost),
+and max level flight speed. Adjust weight, altitude, RPM, and power setting with
+sliders and everything updates instantly.
+
+**POH Charts** — Standard GA presentation formats you can print and put in your
+POH supplement:
+- *Thrust & Drag vs Airspeed* — Classic engineering view showing thrust curve,
+  total drag, parasite drag, and induced drag. Vy, Vx, Vbg, and VM are marked
+  at their intersections/extrema.
+- *Rate of Climb vs Density Altitude* — Multiple curves, one per gross weight.
+  The altitude where each curve crosses ~100 fpm is the service ceiling at that
+  weight. Standard POH format.
+- *V-Speeds vs Gross Weight* — How Vy, Vx, Vbg, and Vmd change with loading.
+  Laminate this one for the cockpit.
+- *Glide Performance Table* — Weight, Vbg, L/D ratio, nm per 1000 ft, and
+  minimum sink rate. The glide card for your kneeboard.
+
+**Table** — The full performance table (KCAS, KTAS, efficiency, thrust, drag, ROC,
+AOC, ROS, AOG) with optimum-speed rows highlighted. Same output as `run-validation`
+on the JVM.
+
+**Explore** — Contour/heatmap plots for building intuition about the performance
+envelope. Currently shows rate of climb as a color map across the full
+weight-altitude space, with contour lines at 100, 200, 500, and 1000 fpm. The
+100 fpm contour is the service ceiling line.
+
+All charts are pure SVG and print cleanly to PDF via the Print button (the sliders
+and navigation hide automatically).
+
 ### Google Sheet (`bootstrap_method.xlsx`)
 
 A three-tab spreadsheet for data collection and initial computation:
@@ -71,7 +136,15 @@ computed, green are results.
 ### Prerequisites
 
 - [Clojure CLI](https://clojure.org/guides/install_clojure) (1.11+)
+- [Node.js](https://nodejs.org/) (18+, for the web app)
 - [uv](https://github.com/astral-sh/uv) (for regenerating the spreadsheet, optional)
+
+### Launch the Web App
+
+```bash
+npm install                    # first time only
+npx shadow-cljs watch app     # opens dev server at http://localhost:8280
+```
 
 ### Run the Validation
 

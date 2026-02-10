@@ -10,13 +10,19 @@ from a small set of flight-test-derived parameters called the "bootstrap data pl
 ## Project Structure
 
 ```
-src/bootstrap/performance.clj   — Performance calculator (single namespace)
+src/bootstrap/performance.cljc  — Performance calculator (.cljc = JVM + CLJS)
+src/bootstrap/app.cljs          — Reagent web app (views, sliders, state)
+src/bootstrap/charts.cljs       — SVG chart components (line chart, heatmap)
 test/bootstrap/performance_test.clj — Test suite (10 tests, 40 assertions)
 bootstrap_method.xlsx            — Google Sheet template (3 tabs)
 create_sheet.py                  — Python script that generates the .xlsx
 bootstp1.xls / bootstp2.xls     — Original Lowry spreadsheets (reference only)
 PerfOfLightAircraft.pdf          — Lowry's book (scanned, not text-extractable)
 deps.edn                         — Clojure project config
+shadow-cljs.edn                  — ClojureScript build config (Reagent, dev server)
+package.json                     — Node deps (shadow-cljs, react, react-dom)
+public/index.html                — Web app HTML shell
+public/css/style.css             — App styling + @media print rules
 pyproject.toml                   — Python/uv config (for xlrd + openpyxl)
 ```
 
@@ -38,6 +44,12 @@ REPL usage:
 (def table (p/performance-table p/r182-data-plate p/r182-ops))
 (p/print-table table)
 (p/print-optimums (p/optimum-speeds table))
+```
+
+Launch the web app (dev server at http://localhost:8280):
+```
+npm install                    # first time only
+npx shadow-cljs watch app
 ```
 
 Regenerate the Google Sheet (requires `uv`):
@@ -74,6 +86,20 @@ eta_raw = interpolate(GAGPC, CPX, h)
 eta = eta_raw * SDF       → installed efficiency
 ```
 
+### V-Speeds
+The calculator finds five optimum speeds from the performance table:
+- **Vy** — Best rate of climb. Max ROC (ft/min). Use for normal climbs.
+- **Vx** — Best angle of climb. Max AOC (degrees). Use for obstacle clearance.
+- **Vbg** — Best glide. Min glide angle = max L/D. Parasite drag = induced drag
+  at this speed. Use after engine failure to maximize distance.
+- **Vmd** — Minimum descent rate. Min ROS (ft/min). Slower than Vbg. Use to stay
+  aloft the longest (e.g., circling near a field, waiting for help). Minimizes
+  altitude lost per unit *time*, vs Vbg which minimizes altitude lost per unit
+  *distance*.
+- **VM** — Max level flight speed. Highest KCAS where thrust >= drag. The practical
+  top speed at current power/altitude. Returns nil if the aircraft can't sustain
+  level flight (e.g., very high altitude or very low power).
+
 ### Validation Target
 The Cessna R182 example from bootstp2.xls must match to 3+ significant figures:
 - Vy = 77.0 KCAS, ROC = 371.7 ft/min
@@ -109,3 +135,31 @@ Three tabs:
 2. **Flight Tests -> CD0, e** — Enter glide/climb runs, curve fit extracts CD0/e/Vbg.
    Climb tests log RPM + % Power (from Dynon) for validation against predictions.
 3. **Data Plate** — Pulls from other tabs, includes copy-paste Clojure map literal
+
+## Web App (Reagent + shadow-cljs)
+
+The performance calculator runs in the browser via ClojureScript. The same
+`performance.cljc` code that passes the JVM test suite executes client-side —
+no server, instant slider response.
+
+### Architecture
+- `performance.cljc` — Cross-platform math via reader conditionals (`#?(:clj ... :cljs ...)`)
+- `app.cljs` — Reagent app with a single state atom; sliders trigger reactive recomputation
+- `charts.cljs` — Pure SVG rendering (line charts, heatmaps); no charting library dependency
+
+### Four Views
+1. **Dashboard** — V-speed cards + key numbers (max ROC, best glide L/D, glide range)
+2. **POH Charts** — Thrust-drag vs airspeed, ROC vs altitude (multi-weight), V-speeds
+   vs weight, glide performance table. Standard GA POH formats, printable.
+3. **Table** — Full performance table with highlighted optimum rows
+4. **Explore** — ROC contour heatmap over weight × altitude space
+
+### Sliders (shared across all views)
+- Gross Weight: 1800–3100 lbs, step 10
+- Density Altitude: 0–14,000 ft, step 100
+- RPM: 1800–2700, step 50
+- % Power: 0.40–1.00, step 0.01
+
+### Print Support
+POH Charts and Table views have a Print button. `@media print` CSS hides sliders
+and navigation. Charts are inline SVG so they print at full resolution.
