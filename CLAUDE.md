@@ -40,10 +40,14 @@ REPL usage:
 (p/print-optimums (p/optimum-speeds table))
 ```
 
-Regenerate the Google Sheet:
+Regenerate the Google Sheet (requires `uv`):
 ```
 uv run python create_sheet.py
 ```
+
+**Python dependency management**: This project uses [uv](https://github.com/astral-sh/uv)
+for Python. Dependencies (openpyxl, xlrd) are declared in `pyproject.toml`. Always use
+`uv run python ...` to run Python scripts — never bare `python`.
 
 ## Key Technical Details
 

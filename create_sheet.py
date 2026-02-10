@@ -8,6 +8,9 @@ Upload the resulting .xlsx to Google Sheets.
 """
 
 import openpyxl
+from openpyxl.chart import ScatterChart, Reference, Series
+from openpyxl.chart.label import DataLabelList
+from openpyxl.chart.trendline import Trendline
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, numbers
 from openpyxl.utils import get_column_letter
 
@@ -313,7 +316,7 @@ def create_tab2_flight_tests(wb):
     r = 50
     style_cell(ws, r, 1, "Vbg (KCAS):", font=BOLD)
     style_cell(ws, r, 2, "=B49*SQRT($B$19)*0.5924838", fill=RESULT_FILL, fmt="0.0")
-    style_cell(ws, r, 3, "= V_bg_TAS × √σ × 0.5924838", border=False)
+    style_cell(ws, r, 3, "V_bg_TAS × √σ × 0.5924838", border=False)
 
     # === CD0 and e from curve fit ===
     r = 52
@@ -323,20 +326,20 @@ def create_tab2_flight_tests(wb):
     r = 53
     style_cell(ws, r, 1, "CD0:", font=BOLD)
     style_cell(ws, r, 2, "=B47*2*B46*$B$18/($B$20*$B$5)", fill=RESULT_FILL, fmt="0.00000")
-    style_cell(ws, r, 3, "= a × 2·W·ΔH / (ρ·S)", border=False)
+    style_cell(ws, r, 3, "a × 2·W·ΔH / (ρ·S)", border=False)
 
     # e = 2·W / (b × ρ·S·π·A·ΔH)
     r = 54
     style_cell(ws, r, 1, "e (efficiency factor):", font=BOLD)
     style_cell(ws, r, 2, "=2*B46/(B48*$B$20*$B$5*PI()*$B$7*$B$18)",
                fill=RESULT_FILL, fmt="0.000")
-    style_cell(ws, r, 3, "= 2·W / (b·ρ·S·π·A·ΔH)", border=False)
+    style_cell(ws, r, 3, "2·W / (b·ρ·S·π·A·ΔH)", border=False)
 
     # Max L/D for reference
     r = 55
     style_cell(ws, r, 1, "Max L/D:", font=BOLD)
     style_cell(ws, r, 2, "=1/(2*SQRT(B53/(PI()*$B$7*B54)))", fill=CALC_FILL, fmt="0.0")
-    style_cell(ws, r, 3, "= 1 / (2·√(CD0/(π·A·e)))", border=False)
+    style_cell(ws, r, 3, "1 / (2·√(CD0/(π·A·e)))", border=False)
 
     # R² for fit quality
     r = 56
@@ -374,6 +377,102 @@ def create_tab2_flight_tests(wb):
         style_cell(ws, row, 7, f"=$B$18/F{row}*60", fill=CALC_FILL, fmt="0.0")
         style_cell(ws, row, 8, None, fill=INPUT_FILL)  # RPM
         style_cell(ws, row, 9, None, fill=INPUT_FILL)  # % Power from Dynon
+
+    # === Climb test analysis: derive Vx from measured data ===
+    r = 77
+    style_cell(ws, r, 1, "Climb Test Analysis", font=SECTION_FONT, border=False)
+    r = 78
+    style_cell(ws, r, 1, "Best ROC speed (Vy):", font=BOLD)
+    # Find KCAS of the row with max ROC. Use INDEX/MATCH.
+    style_cell(ws, r, 2,
+               "=IFERROR(INDEX(E64:E75,MATCH(MAX(G64:G75),G64:G75,0)),\"\")",
+               fill=RESULT_FILL, fmt="0.0")
+    style_cell(ws, r, 3, "KCAS", font=BOLD)
+    style_cell(ws, r, 4, "KCAS at max ROC", border=False)
+
+    r = 79
+    style_cell(ws, r, 1, "Max ROC:", font=BOLD)
+    style_cell(ws, r, 2, "=IFERROR(MAX(G64:G75),\"\")", fill=RESULT_FILL, fmt="0.0")
+    style_cell(ws, r, 3, "ft/min", font=BOLD)
+
+    r = 80
+    style_cell(ws, r, 1, "Best climb angle speed (Vx):", font=BOLD)
+    # Climb angle ≈ arcsin(ROC / (V_TAS × 60)) in degrees
+    # But for finding the max, we can compute sin(γ) = ROC/(V*60) for each row.
+    # V_TAS(fps) = (KCAS / √σ) / 0.5924838
+    # Climb angle = DEGREES(ASIN(ROC / (V_TAS * 60)))
+    # We need a helper column. Let's put climb angle in column J.
+    style_cell(ws, r, 2,
+               "=IFERROR(INDEX(E64:E75,MATCH(MAX(J64:J75),J64:J75,0)),\"\")",
+               fill=RESULT_FILL, fmt="0.0")
+    style_cell(ws, r, 3, "KCAS", font=BOLD)
+    style_cell(ws, r, 4, "KCAS at max climb angle", border=False)
+
+    r = 81
+    style_cell(ws, r, 1, "Max climb angle:", font=BOLD)
+    style_cell(ws, r, 2, "=IFERROR(MAX(J64:J75),\"\")", fill=RESULT_FILL, fmt="0.00")
+    style_cell(ws, r, 3, "degrees", font=BOLD)
+
+    # Add climb angle column header and formulas
+    style_cell(ws, 63, 10, "Climb Angle (°)", font=BOLD)
+    for run in range(1, 13):
+        row = 63 + run
+        # Climb angle = DEGREES(ATAN(ROC / (V_TAS * 60)))
+        # V_TAS = (KCAS / sqrt(sigma)) / 0.5924838
+        style_cell(ws, row, 10,
+                   f"=IFERROR(DEGREES(ATAN(G{row}/(((E{row}/SQRT($B$19))/0.5924838)*60))),\"\")",
+                   fill=CALC_FILL, fmt="0.00")
+
+    r = 83
+    style_cell(ws, r, 1, "Compare these against bootstrap predictions:", border=False)
+    style_cell(ws, r, 4,
+               "Run the Clojure calculator at the same W, h, RPM, % power",
+               border=False)
+
+    # === CHARTS ===
+    # Chart 1: V/Δt vs V⁴ (the regression basis — shows linearity)
+    chart1 = ScatterChart()
+    chart1.title = "Glide Regression: V/Δt vs V⁴"
+    chart1.x_axis.title = "V⁴ (fps⁴)"
+    chart1.y_axis.title = "V/Δt (fps/sec)"
+    chart1.width = 18
+    chart1.height = 12
+
+    x_data = Reference(ws, min_col=10, min_row=31, max_row=43)  # V⁴ (col J)
+    y_data = Reference(ws, min_col=9, min_row=31, max_row=43)   # V/Δt (col I)
+    series1 = Series(y_data, x_data, title="Glide data")
+    series1.graphicalProperties.line.noFill = True  # scatter, no line
+    series1.trendline = Trendline(trendlineType="linear", dispRSqr=True, dispEq=True)
+    chart1.series.append(series1)
+    ws.add_chart(chart1, "A86")
+
+    # Chart 2: KCAS × Δt vs KCAS (intuitive view — peak = Vbg)
+    chart2 = ScatterChart()
+    chart2.title = "Glide Endurance: KCAS × Δt vs KCAS"
+    chart2.x_axis.title = "KCAS"
+    chart2.y_axis.title = "KCAS × Δt"
+    chart2.width = 18
+    chart2.height = 12
+
+    x_data2 = Reference(ws, min_col=5, min_row=31, max_row=43)  # KCAS (col E)
+    y_data2 = Reference(ws, min_col=8, min_row=31, max_row=43)  # KCAS×Δt (col H)
+    series2 = Series(y_data2, x_data2, title="Glide data")
+    chart2.series.append(series2)
+    ws.add_chart(chart2, "A102")
+
+    # Chart 3: Climb ROC vs KCAS
+    chart3 = ScatterChart()
+    chart3.title = "Climb Rate vs Airspeed"
+    chart3.x_axis.title = "KCAS"
+    chart3.y_axis.title = "Rate of Climb (ft/min)"
+    chart3.width = 18
+    chart3.height = 12
+
+    x_data3 = Reference(ws, min_col=5, min_row=63, max_row=75)  # KCAS (col E)
+    y_data3 = Reference(ws, min_col=7, min_row=63, max_row=75)  # ROC (col G)
+    series3 = Series(y_data3, x_data3, title="Climb data")
+    chart3.series.append(series3)
+    ws.add_chart(chart3, "A118")
 
 
 def create_tab3_data_plate(wb):
@@ -437,7 +536,7 @@ def create_tab3_data_plate(wb):
     style_cell(ws, r, 1, "A (aspect ratio)", font=BOLD)
     style_cell(ws, r, 2, "=B6^2/B5", fill=CALC_FILL, fmt="0.000")
     style_cell(ws, r, 3, "")
-    style_cell(ws, r, 4, "= B² / S")
+    style_cell(ws, r, 4, "B² / S")
 
     # === Clojure data plate literal ===
     r += 2
