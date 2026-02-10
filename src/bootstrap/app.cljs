@@ -50,9 +50,9 @@
      [slider {:label "RPM" :value N
               :min-val 1800 :max-val 2700 :step 50
               :on-change #(swap! state assoc :N %)}]
-     [slider {:label "% Power" :value pct-power
-              :min-val 0.40 :max-val 1.00 :step 0.01
-              :on-change #(swap! state assoc :pct-power %)}]]))
+     [slider {:label "% Power" :value (* pct-power 100)
+              :min-val 40 :max-val 100 :step 1 :unit "%"
+              :on-change #(swap! state assoc :pct-power (/ % 100))}]]))
 
 ;; =============================================================================
 ;; Compute helpers
@@ -299,12 +299,35 @@
        :y-domain [h-min h-max]
        :grid grid :nx nx :ny ny
        :v-min 0 :v-max v-max
-       :contour-levels [100 200 500 1000]
+       :contour-levels [100 200 300 400 500 750 1000 1250 1500]
        :legend-label "fpm"}]]))
+
+(defn data-plate-panel []
+  (let [dp (:data-plate @state)]
+    [:div.chart-container
+     [:div.chart-title "Bootstrap Data Plate"]
+     [:table.data-plate-table
+      [:thead
+       [:tr [:th "Parameter"] [:th "Value"] [:th "Units"]]]
+      [:tbody
+       [:tr [:td "Aircraft"] [:td {:col-span 2} [:strong (str (:tail-number dp) " " (:type dp))]]]
+       [:tr [:td "S (wing area)"] [:td (charts/format-num (:S dp) 1)] [:td "ft\u00B2"]]
+       [:tr [:td "B (wing span)"] [:td (charts/format-num (:B dp) 1)] [:td "ft"]]
+       [:tr [:td "P0 (rated power)"] [:td (charts/format-num (:P0 dp) 0)] [:td "hp"]]
+       [:tr [:td "N0 (rated RPM)"] [:td (str (:N0 dp))] [:td "RPM"]]
+       [:tr [:td "d (prop diameter)"] [:td (charts/format-num (:d dp) 3)] [:td "ft"]]
+       [:tr [:td "CD0"] [:td (charts/format-num (:CD0 dp) 5)] [:td ""]]
+       [:tr [:td "e (efficiency)"] [:td (charts/format-num (:e dp) 3)] [:td ""]]
+       [:tr [:td "TAF"] [:td (charts/format-num (:TAF dp) 1)] [:td ""]]
+       [:tr [:td "Z (fuse/prop dia)"] [:td (charts/format-num (:Z dp) 3)] [:td ""]]
+       [:tr [:td "Configuration"] [:td (if (:tractor? dp) "Tractor" "Pusher")] [:td ""]]
+       [:tr [:td "BB (blades)"] [:td (str (:BB dp))] [:td ""]]
+       [:tr [:td "C (power dropoff)"] [:td (charts/format-num (:C dp) 2)] [:td ""]]]]]))
 
 (defn explore-view []
   [:div
-   [roc-contour]])
+   [roc-contour]
+   [data-plate-panel]])
 
 ;; =============================================================================
 ;; Performance table view
@@ -356,6 +379,99 @@
              [:td.vspeed-label (:label vs)]]))]]]]))
 
 ;; =============================================================================
+;; About view
+;; =============================================================================
+
+(defn about-view []
+  [:div.about
+   [:div.chart-container
+    [:h2 {:style {:color "var(--primary)" :margin-bottom "1rem"}} "About the Bootstrap Method"]
+    [:p "The "
+     [:strong "Bootstrap Method"]
+     " is an aircraft performance prediction technique developed by John T. Lowry in "
+     [:em "Performance of Light Aircraft"]
+     " (AIAA, 1999). It derives a complete performance envelope\u2014thrust, drag, "
+     "climb, glide, and optimum V-speeds\u2014from a small set of flight-test-derived "
+     "parameters called the " [:strong "bootstrap data plate"] "."]
+    [:p {:style {:margin-top "0.75rem"}}
+     "The data plate consists of just nine parameters that characterize an aircraft: "
+     "wing area (S), wing span (B), rated power (P0), rated RPM (N0), propeller "
+     "diameter (d), parasite drag coefficient (CD0), airplane efficiency factor (e), "
+     "total activity factor (TAF), and fuselage-to-prop diameter ratio (Z). "
+     "CD0 and e come from glide flight tests; TAF comes from measuring the propeller "
+     "blades. Everything else comes from the POH or direct measurement."]
+    [:p {:style {:margin-top "0.75rem"}}
+     "From these nine numbers, the method computes propeller efficiency at every "
+     "airspeed using the Boeing/Uddenberg GAGPC polynomial model, then builds a "
+     "full performance table: thrust available, parasite and induced drag, rate of "
+     "climb, angle of climb, rate of sink, and glide angle."]
+    [:p {:style {:margin-top "0.75rem" :font-weight 600 :color "var(--warning)"}}
+     "Note: This calculator implements the constant-speed propeller version of the "
+     "Bootstrap Method. Fixed-pitch propeller aircraft require a different propeller "
+     "model (see Lowry Ch. 5 or the AvWeb Part 1 article below)."]]
+
+   [:div.chart-container
+    [:h3 {:style {:color "var(--primary)" :margin-bottom "0.75rem"}} "V-Speeds"]
+    [:p "The calculator finds five optimum speeds from the performance table:"]
+    [:dl.vspeed-defs
+     [:div.vspeed-def
+      [:dt "Vy \u2014 Best Rate of Climb"]
+      [:dd "Maximum rate of climb (ft/min). Use for normal climbs to reach "
+       "cruise altitude efficiently."]]
+     [:div.vspeed-def
+      [:dt "Vx \u2014 Best Angle of Climb"]
+      [:dd "Steepest climb angle (degrees). Use for obstacle clearance after "
+       "takeoff or when you need to gain the most altitude over the shortest "
+       "ground distance."]]
+     [:div.vspeed-def
+      [:dt "Vbg \u2014 Best Glide"]
+      [:dd "Maximum lift-to-drag ratio (L/D). At this speed, parasite drag "
+       "equals induced drag. Use after engine failure to maximize glide distance."]]
+     [:div.vspeed-def
+      [:dt "Vmd \u2014 Minimum Descent Rate"]
+      [:dd "Minimizes altitude lost per unit time. Slower than Vbg. Use when "
+       "circling near a field or waiting for help\u2014stay aloft the longest."]]
+     [:div.vspeed-def
+      [:dt "VM \u2014 Max Level Flight"]
+      [:dd "Highest airspeed where thrust meets or exceeds drag. The practical "
+       "top speed at current power and altitude."]]]]
+
+   [:div.chart-container
+    [:h3 {:style {:color "var(--primary)" :margin-bottom "0.75rem"}} "How to Use This App"]
+    [:ol {:style {:padding-left "1.25rem" :line-height 1.8}}
+     [:li [:strong "Dashboard"] " \u2014 V-speed cards and key performance numbers "
+      "at the current slider settings."]
+     [:li [:strong "POH Charts"] " \u2014 Thrust/drag vs airspeed, rate of climb vs "
+      "altitude, V-speeds vs weight, and a glide performance table. Printable for "
+      "use as a personal POH supplement."]
+     [:li [:strong "Table"] " \u2014 Full performance table with V-speed rows highlighted. "
+      "Printable."]
+     [:li [:strong "Explore"] " \u2014 Rate-of-climb contour heatmap over the full "
+      "weight/altitude envelope, plus the bootstrap data plate."]
+     [:li [:strong "Sliders"] " \u2014 Adjust gross weight, density altitude, RPM, and "
+      "percent power. All views update instantly."]]
+    [:p {:style {:margin-top "0.75rem" :color "var(--text-muted)" :font-size "0.85rem"}}
+     "The same performance calculator code runs on the JVM (for testing) and in the "
+     "browser (ClojureScript). No server required\u2014all computation happens client-side."]]
+
+   [:div.chart-container
+    [:h3 {:style {:color "var(--primary)" :margin-bottom "0.75rem"}} "References"]
+    [:ul {:style {:padding-left "1.25rem" :line-height 1.8}}
+     [:li "John T. Lowry, "
+      [:em "Performance of Light Aircraft"]
+      " (AIAA, 1999) \u2014 "
+      [:a {:href "PerfOfLightAircraft.pdf" :target "_blank"} "PDF in this repository"]]
+     [:li "AvWeb: "
+      [:a {:href "https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-performancepart-one-fixed-pitch-propeller-airplanes/"
+           :target "_blank" :rel "noopener"}
+       "The Bootstrap Approach \u2014 Part 1: Fixed-Pitch Propeller Airplanes"]]
+     [:li "AvWeb: "
+      [:a {:href "https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-performancepart-two-constant-speed-propeller-airplanes/"
+           :target "_blank" :rel "noopener"}
+       "The Bootstrap Approach \u2014 Part 2: Constant-Speed Propeller Airplanes"]
+      " (this is the version implemented here)"]]]])
+
+;; =============================================================================
 ;; App root
 ;; =============================================================================
 
@@ -376,14 +492,16 @@
       (for [[k label] [[:dashboard "Dashboard"]
                         [:poh-charts "POH Charts"]
                         [:table "Table"]
-                        [:explore "Explore"]]]
+                        [:explore "Explore"]
+                        [:about "About"]]]
         ^{:key k}
         [:button.nav-tab {:class (when (= view k) "active")
                           :on-click #(swap! state assoc :view k)}
          label])]
 
-     ;; Sliders
-     [controls-panel]
+     ;; Sliders (hidden on About page)
+     (when (not= view :about)
+       [controls-panel])
 
      ;; Active view
      (case view
@@ -391,6 +509,7 @@
        :poh-charts [poh-charts-view]
        :table [table-view]
        :explore [explore-view]
+       :about [about-view]
        [dashboard-view])]))
 
 ;; =============================================================================

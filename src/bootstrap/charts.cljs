@@ -196,29 +196,68 @@
                  :height (+ cell-h 0.5)
                  :fill (color-scale v v-min v-max)}]))
 
-     ;; Contour lines (simple: draw borders between cells that cross a level)
+     ;; Contour lines via marching squares
      (when contour-levels
-       [:g {:stroke "rgba(0,0,0,0.4)" :stroke-width 1 :fill "none"}
-        (for [level contour-levels
-              yi (range (dec ny))
-              xi (range (dec nx))]
-          (let [v00 (get-in grid [yi xi] 0)
-                v10 (get-in grid [yi (inc xi)] 0)
-                v01 (get-in grid [(inc yi) xi] 0)
-                crosses-h? (or (and (<= v00 level) (> v10 level))
-                               (and (> v00 level) (<= v10 level)))
-                crosses-v? (or (and (<= v00 level) (> v01 level))
-                               (and (> v00 level) (<= v01 level)))
-                cx (+ pad-l (* (+ xi 0.5) cell-w))
-                cy (+ pad-t (* (+ yi 0.5) cell-h))]
-            ^{:key (str "c" level "-" xi "-" yi)}
-            [:g
-             (when crosses-h?
-               [:line {:x1 (+ cx (/ cell-w 2)) :y1 cy
-                       :x2 (+ cx (/ cell-w 2)) :y2 (+ cy cell-h)}])
-             (when crosses-v?
-               [:line {:x1 cx :y1 (+ cy (/ cell-h 2))
-                       :x2 (+ cx cell-w) :y2 (+ cy (/ cell-h 2))}])]))])
+       (letfn [(gx [xi] (+ pad-l (* (+ xi 0.5) cell-w)))
+               (gy [yi] (+ pad-t (* (+ yi 0.5) cell-h)))
+               (ms-interp [v1 v2 level]
+                 (if (== v1 v2) 0.5 (/ (- level v1) (- v2 v1))))
+               (ms-segments [level]
+                 (for [yi (range (dec ny))
+                       xi (range (dec nx))
+                       :let [tl (get-in grid [yi xi] 0)
+                             tr (get-in grid [yi (inc xi)] 0)
+                             bl (get-in grid [(inc yi) xi] 0)
+                             br (get-in grid [(inc yi) (inc xi)] 0)
+                             ci (bit-or (if (>= tl level) 8 0)
+                                        (if (>= tr level) 4 0)
+                                        (if (>= br level) 2 0)
+                                        (if (>= bl level) 1 0))
+                             top    [(+ (gx xi) (* (ms-interp tl tr level) cell-w)) (gy yi)]
+                             right  [(gx (inc xi)) (+ (gy yi) (* (ms-interp tr br level) cell-h))]
+                             bottom [(+ (gx xi) (* (ms-interp bl br level) cell-w)) (gy (inc yi))]
+                             left   [(gx xi) (+ (gy yi) (* (ms-interp tl bl level) cell-h))]]
+                       seg (case ci
+                             (0 15) []
+                             1      [[left bottom]]
+                             2      [[bottom right]]
+                             3      [[left right]]
+                             4      [[top right]]
+                             5      (if (>= (/ (+ tl tr br bl) 4.0) level)
+                                     [[top left] [right bottom]]
+                                     [[top right] [left bottom]])
+                             6      [[top bottom]]
+                             7      [[top left]]
+                             8      [[top left]]
+                             9      [[top bottom]]
+                             10     (if (>= (/ (+ tl tr br bl) 4.0) level)
+                                     [[top right] [left bottom]]
+                                     [[top left] [right bottom]])
+                             11     [[top right]]
+                             12     [[left right]]
+                             13     [[bottom right]]
+                             14     [[left bottom]]
+                             [])]
+                   seg))]
+         [:g
+          (for [level contour-levels
+                :let [segs (vec (ms-segments level))
+                      label-idx (quot (count segs) 2)]]
+            ^{:key (str "cl" level)}
+            [:g {:stroke "rgba(0,0,0,0.5)" :stroke-width 1.2 :fill "none"}
+             (for [[i [[x1 y1] [x2 y2]]] (map-indexed vector segs)]
+               ^{:key i}
+               [:line {:x1 x1 :y1 y1 :x2 x2 :y2 y2}])
+             ;; Label at one representative segment
+             (when-let [[[lx1 ly1] [lx2 ly2]] (get segs label-idx)]
+               (let [mx (/ (+ lx1 lx2) 2)
+                     my (/ (+ ly1 ly2) 2)]
+                 [:g
+                  [:rect {:x (- mx 14) :y (- my 7) :width 28 :height 14
+                          :rx 2 :fill "white" :fill-opacity 0.85}]
+                  [:text {:x mx :y (+ my 4) :text-anchor "middle"
+                          :font-size 10 :font-weight 600 :fill "rgba(0,0,0,0.7)"}
+                   (str level)]]))])]))
 
      ;; Axes
      [:line {:x1 pad-l :y1 (+ pad-t ph) :x2 (+ pad-l pw) :y2 (+ pad-t ph)

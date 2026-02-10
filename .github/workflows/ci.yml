@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Java + Clojure ──
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Clojure CLI
+        uses: DeLaGuardo/setup-clojure@13.0
+        with:
+          cli: latest
+
+      - name: Cache Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+          key: clj-${{ hashFiles('deps.edn') }}
+
+      - name: Clojure tests
+        run: clj -M:test
+
+      # ── Node (for shadow-cljs compile check) ──
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: ClojureScript compile
+        run: npx shadow-cljs compile app
+
+      # ── Python + uv (for spreadsheet tests) ──
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Spreadsheet tests
+        run: uv run python test_sheet.py

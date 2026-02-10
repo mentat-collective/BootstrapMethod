@@ -14,8 +14,9 @@ src/bootstrap/performance.cljc  — Performance calculator (.cljc = JVM + CLJS)
 src/bootstrap/app.cljs          — Reagent web app (views, sliders, state)
 src/bootstrap/charts.cljs       — SVG chart components (line chart, heatmap)
 test/bootstrap/performance_test.clj — Test suite (10 tests, 40 assertions)
-bootstrap_method.xlsx            — Google Sheet template (3 tabs)
+bootstrap_method.xlsx            — Google Sheet template (4 tabs)
 create_sheet.py                  — Python script that generates the .xlsx
+test_sheet.py                    — Spreadsheet structure tests (54 checks)
 bootstp1.xls / bootstp2.xls     — Original Lowry spreadsheets (reference only)
 PerfOfLightAircraft.pdf          — Lowry's book (scanned, not text-extractable)
 deps.edn                         — Clojure project config
@@ -24,11 +25,20 @@ package.json                     — Node deps (shadow-cljs, react, react-dom)
 public/index.html                — Web app HTML shell
 public/css/style.css             — App styling + @media print rules
 pyproject.toml                   — Python/uv config (for xlrd + openpyxl)
+.github/workflows/ci.yml        — CI: Clojure tests, CLJS compile, sheet tests
+.github/workflows/deploy.yml    — Deploy web app to GitHub Pages
 ```
 
 ## Commands
 
-Run tests:
+Run all tests:
+```
+clj -M:test                    # Clojure performance tests (10 tests, 40 assertions)
+uv run python test_sheet.py    # Spreadsheet structure tests (54 checks)
+npx shadow-cljs compile app    # ClojureScript compile check (0 warnings)
+```
+
+Run Clojure tests only:
 ```
 clj -M:test
 ```
@@ -130,11 +140,18 @@ Regression columns: I = V_TAS/Δt (y), J = V_TAS⁴ (x). SLOPE/INTERCEPT extract
 Full derivation in README.md.
 
 ## Google Sheet (bootstrap_method.xlsx)
-Three tabs:
+Five tabs (for constant-speed propeller aircraft only):
+0. **Instructions** — Overview of the Bootstrap Method, workflow steps, V-speed
+   definitions, references (Lowry book, AvWeb articles), and color key.
 1. **Prop Blade -> TAF** — Enter blade widths at 17 stations, auto-computes BAF, TAF, X
 2. **Flight Tests -> CD0, e** — Enter glide/climb runs, curve fit extracts CD0/e/Vbg.
    Climb tests log RPM + % Power (from Dynon) for validation against predictions.
-3. **Data Plate** — Pulls from other tabs, includes copy-paste Clojure map literal
+3. **Data Plate** — Single source of truth for the bootstrap data plate. Yellow cells
+   are manual inputs (pre-filled with R182 defaults). Green cells pull from other tabs
+   (CD0/e from Tab 2, TAF from Tab 1). Includes copy-paste Clojure map literal.
+4. **Performance Calculator** — Full Bootstrap Method computation. Data plate cells
+   link to the Data Plate tab (green cells); operational variables (W, h, N, %power)
+   are local inputs (yellow cells). Pre-filled with R182 validation conditions.
 
 ## Web App (Reagent + shadow-cljs)
 
@@ -147,18 +164,25 @@ no server, instant slider response.
 - `app.cljs` — Reagent app with a single state atom; sliders trigger reactive recomputation
 - `charts.cljs` — Pure SVG rendering (line charts, heatmaps); no charting library dependency
 
-### Four Views
+### Five Views
 1. **Dashboard** — V-speed cards + key numbers (max ROC, best glide L/D, glide range)
 2. **POH Charts** — Thrust-drag vs airspeed, ROC vs altitude (multi-weight), V-speeds
    vs weight, glide performance table. Standard GA POH formats, printable.
 3. **Table** — Full performance table with highlighted optimum rows
-4. **Explore** — ROC contour heatmap over weight × altitude space
+4. **Explore** — ROC contour heatmap over weight × altitude space, plus data plate
+5. **About** — Explains the Bootstrap Method, V-speed definitions, and app usage
 
-### Sliders (shared across all views)
+### Sliders (shared across all views except About)
 - Gross Weight: 1800–3100 lbs, step 10
 - Density Altitude: 0–14,000 ft, step 100
 - RPM: 1800–2700, step 50
 - % Power: 0.40–1.00, step 0.01
+
+### CI (GitHub Actions)
+On every push to main and every PR, `.github/workflows/ci.yml` runs:
+1. `clj -M:test` — Clojure performance tests (10 tests, 40 assertions)
+2. `npx shadow-cljs compile app` — ClojureScript compile (0 warnings required)
+3. `uv run python test_sheet.py` — Spreadsheet structure tests (54 checks)
 
 ### Print Support
 POH Charts and Table views have a Print button. `@media print` CSS hides sliders

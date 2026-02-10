@@ -504,17 +504,17 @@ def create_tab3_data_plate(wb):
 
     # Data rows
     params = [
-        ("S (wing area)",         None,    "ft²",       "POH / plans",         INPUT_FILL),
-        ("B (wing span)",         None,    "ft",        "POH / plans",         INPUT_FILL),
-        ("P0 (rated power)",      None,    "hp",        "POH",                 INPUT_FILL),
-        ("N0 (rated RPM)",        None,    "RPM",       "POH",                 INPUT_FILL),
-        ("d (prop diameter)",     None,    "ft",        "Measurement",         INPUT_FILL),
+        ("S (wing area)",         174.0,   "ft²",       "POH / plans",         INPUT_FILL),
+        ("B (wing span)",         36.0,    "ft",        "POH / plans",         INPUT_FILL),
+        ("P0 (rated power)",      235.0,   "hp",        "POH",                 INPUT_FILL),
+        ("N0 (rated RPM)",        2400,    "RPM",       "POH",                 INPUT_FILL),
+        ("d (prop diameter)",     6.83,    "ft",        "Measurement",         INPUT_FILL),
         ("CD0",                   "='Flight Tests → CD0, e'!B53", "",  "Tab 2 (curve fit)",  RESULT_FILL),
         ("e",                     "='Flight Tests → CD0, e'!B54", "",  "Tab 2 (curve fit)",  RESULT_FILL),
         ("TAF",                   "='Prop Blade → TAF'!B32",      "",  "Tab 1 (prop measurement)", RESULT_FILL),
-        ("Z (fuselage dia / prop dia)", None, "",       "Measurement: fuse_dia / prop_dia", INPUT_FILL),
+        ("Z (fuselage dia / prop dia)", 0.688, "",      "Measurement: fuse_dia / prop_dia", INPUT_FILL),
         ("Tractor? (1=yes, 0=no)", 1,      "",          "Configuration",       INPUT_FILL),
-        ("BB (num blades)",       None,    "",           "Observation",         INPUT_FILL),
+        ("BB (num blades)",       2,       "",           "Observation",         INPUT_FILL),
         ("C (power dropoff)",     0.12,    "",           "Typical normally-aspirated: 0.12", INPUT_FILL),
     ]
 
@@ -658,30 +658,31 @@ def create_tab4_performance(wb):
     # =====================================================================
     style_cell(ws, 18, 1, "Aircraft Data Plate",
                font=SECTION_FONT, border=False)
-    style_cell(ws, 18, 4, "(R182 defaults \u2014 replace with your values)",
+    style_cell(ws, 18, 4, "(linked from Data Plate tab)",
                border=False)
 
-    # Data plate: (row, default_value, label, units, fmt)
+    # Data plate: (row, formula, label, units, fmt)
+    # Each cell references the Data Plate tab directly.
     # Row mapping:  S=B19, B=B20, P0=B21, N0=B22, d=B23,
     #               CD0=B24, e=B25, TAF=B26, Z=B27,
     #               Tractor?=B28, BB=B29, C=B30
     dp_params = [
-        (19, 174.0,   "S (wing area)",          "ft\u00b2", "0.0"),
-        (20, 36.0,    "B (wing span)",           "ft",       "0.0"),
-        (21, 235.0,   "P0 (rated power)",        "hp",       "0.0"),
-        (22, 2400,    "N0 (rated RPM)",          "RPM",      "0"),
-        (23, 6.83,    "d (prop diameter)",        "ft",       "0.000"),
-        (24, 0.02874, "CD0",                      "",         "0.00000"),
-        (25, 0.72,    "e",                         "",         "0.000"),
-        (26, 195.9,   "TAF",                       "",         "0.0"),
-        (27, 0.688,   "Z (fuse dia / prop dia)",   "",         "0.000"),
-        (28, 1,       "Tractor? (1=yes, 0=no)",    "",         "0"),
-        (29, 2,       "BB (num blades)",            "",         "0"),
-        (30, 0.12,    "C (power dropoff)",          "",         "0.00"),
+        (19, "='Data Plate'!B5",  "S (wing area)",          "ft\u00b2", "0.0"),
+        (20, "='Data Plate'!B6",  "B (wing span)",           "ft",       "0.0"),
+        (21, "='Data Plate'!B7",  "P0 (rated power)",        "hp",       "0.0"),
+        (22, "='Data Plate'!B8",  "N0 (rated RPM)",          "RPM",      "0"),
+        (23, "='Data Plate'!B9",  "d (prop diameter)",        "ft",       "0.000"),
+        (24, "='Data Plate'!B10", "CD0",                      "",         "0.00000"),
+        (25, "='Data Plate'!B11", "e",                         "",         "0.000"),
+        (26, "='Data Plate'!B12", "TAF",                       "",         "0.0"),
+        (27, "='Data Plate'!B13", "Z (fuse dia / prop dia)",   "",         "0.000"),
+        (28, "='Data Plate'!B14", "Tractor? (1=yes, 0=no)",    "",         "0"),
+        (29, "='Data Plate'!B15", "BB (num blades)",            "",         "0"),
+        (30, "='Data Plate'!B16", "C (power dropoff)",          "",         "0.00"),
     ]
-    for row, default, label, units, fmt in dp_params:
+    for row, formula, label, units, fmt in dp_params:
         style_cell(ws, row, 1, label, font=BOLD)
-        style_cell(ws, row, 2, default, fill=INPUT_FILL, fmt=fmt)
+        style_cell(ws, row, 2, formula, fill=RESULT_FILL, fmt=fmt)
         if units:
             style_cell(ws, row, 3, units, border=False)
 
@@ -998,14 +999,143 @@ def create_tab4_performance(wb):
     ws.add_chart(chart2, f"J{chart_row}")
 
 
+def create_tab0_instructions(wb):
+    """Tab 0: Instructions — overview of the Bootstrap Method and workflow."""
+    ws = wb.create_sheet("Instructions", 0)
+
+    ws.column_dimensions["A"].width = 100
+    ws.sheet_properties.tabColor = "2F5496"
+
+    r = 1
+    style_cell(ws, r, 1,
+               "Bootstrap Method — Aircraft Performance Calculator",
+               font=TITLE_FONT, border=False)
+
+    r = 3
+    style_cell(ws, r, 1, "What is the Bootstrap Method?",
+               font=SECTION_FONT, border=False)
+    r = 4
+    ws.cell(row=r, column=1).value = (
+        "The Bootstrap Method is an aircraft performance prediction technique for "
+        "constant-speed propeller airplanes, developed by John T. Lowry in "
+        "Performance of Light Aircraft (AIAA, 1999). It derives a complete performance "
+        "envelope — thrust, drag, climb, glide, and optimum V-speeds — from a small set "
+        "of flight-test-derived parameters called the 'bootstrap data plate.'")
+    ws.cell(row=r, column=1).alignment = Alignment(wrap_text=True)
+    ws.row_dimensions[r].height = 60
+
+    r = 6
+    ws.cell(row=r, column=1).value = (
+        "IMPORTANT: This spreadsheet implements the constant-speed propeller version "
+        "of the Bootstrap Method using the Boeing/Uddenberg GAGPC propeller efficiency "
+        "model. It is NOT suitable for fixed-pitch propeller aircraft, which require a "
+        "different propeller model (see Lowry Ch. 5 or the AvWeb Part 1 article below).")
+    ws.cell(row=r, column=1).font = Font(bold=True, color="CC0000")
+    ws.cell(row=r, column=1).alignment = Alignment(wrap_text=True)
+    ws.row_dimensions[r].height = 50
+
+    r = 8
+    style_cell(ws, r, 1, "Workflow", font=SECTION_FONT, border=False)
+    steps = [
+        ("Step 1: Measure your propeller (Tab: Prop Blade → TAF)",
+         "Use calipers to measure blade width at 17 standard stations along "
+         "the blade. The spreadsheet computes the Blade Activity Factor (BAF), "
+         "Total Activity Factor (TAF), and the power adjustment factor X. "
+         "This only needs to be done once per propeller."),
+        ("Step 2: Fly glide and climb tests (Tab: Flight Tests → CD0, e)",
+         "Fly a series of timed glides at different airspeeds with prop at low RPM "
+         "and power idle. The spreadsheet uses a V/Δt = a·V⁴ + b curve fit to "
+         "extract the parasite drag coefficient (CD0) and airplane efficiency factor (e). "
+         "Optionally fly climb tests at a known power setting for validation. "
+         "Repeat if you make aerodynamic changes (fairings, seals, etc.)."),
+        ("Step 3: Review the data plate (Tab: Data Plate)",
+         "The Data Plate tab assembles all nine bootstrap parameters from your "
+         "measurements and flight tests. Yellow cells are manual inputs (from your "
+         "POH or measurements); green cells are computed from other tabs. A copy-paste "
+         "Clojure map literal is provided for use with the companion calculator code."),
+        ("Step 4: Explore performance (Tab: Performance Calculator)",
+         "The Performance Calculator computes a full performance table at any "
+         "combination of weight, density altitude, RPM, and percent power. It "
+         "finds all five optimum V-speeds (Vy, Vx, Vbg, Vmd, VM) and includes "
+         "validation against the R182 reference data from Lowry's book. Data plate "
+         "values are linked from the Data Plate tab — change them there."),
+    ]
+
+    for title, desc in steps:
+        r += 1
+        ws.cell(row=r, column=1).value = title
+        ws.cell(row=r, column=1).font = Font(bold=True, size=11)
+        r += 1
+        ws.cell(row=r, column=1).value = desc
+        ws.cell(row=r, column=1).alignment = Alignment(wrap_text=True)
+        ws.row_dimensions[r].height = 55
+        r += 1  # blank row
+
+    r += 1
+    style_cell(ws, r, 1, "V-Speeds", font=SECTION_FONT, border=False)
+    r += 1
+    ws.cell(row=r, column=1).value = (
+        "The calculator finds five optimum speeds from the performance table:")
+    vspeeds = [
+        "Vy — Best Rate of Climb: maximum altitude gain per minute. Use for normal climbs.",
+        "Vx — Best Angle of Climb: steepest climb gradient. Use for obstacle clearance.",
+        "Vbg — Best Glide: maximum L/D. Parasite drag = induced drag at this speed. "
+        "Use after engine failure to maximize glide distance.",
+        "Vmd — Minimum Descent Rate: minimizes altitude lost per unit time (slower "
+        "than Vbg). Use to stay aloft the longest.",
+        "VM — Max Level Flight Speed: highest airspeed where thrust ≥ drag.",
+    ]
+    for v in vspeeds:
+        r += 1
+        ws.cell(row=r, column=1).value = f"  • {v}"
+        ws.cell(row=r, column=1).alignment = Alignment(wrap_text=True)
+        ws.row_dimensions[r].height = 30
+
+    r += 2
+    style_cell(ws, r, 1, "References", font=SECTION_FONT, border=False)
+    refs = [
+        "John T. Lowry, Performance of Light Aircraft (AIAA, 1999) — see "
+        "PerfOfLightAircraft.pdf in this project's repository.",
+        "AvWeb: \"The Bootstrap Approach to Aircraft Performance — Part 1: "
+        "Fixed-Pitch Propeller Airplanes\"",
+        "  https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-"
+        "performancepart-one-fixed-pitch-propeller-airplanes/",
+        "AvWeb: \"The Bootstrap Approach to Aircraft Performance — Part 2: "
+        "Constant-Speed Propeller Airplanes\"",
+        "  https://avweb.com/features_old/the-bootstrap-approach-to-aircraft-"
+        "performancepart-two-constant-speed-propeller-airplanes/",
+    ]
+    for ref in refs:
+        r += 1
+        ws.cell(row=r, column=1).value = ref
+        ws.cell(row=r, column=1).alignment = Alignment(wrap_text=True)
+        if ref.startswith("  http"):
+            ws.cell(row=r, column=1).font = Font(color="0563C1", underline="single")
+        ws.row_dimensions[r].height = 30
+
+    r += 2
+    style_cell(ws, r, 1, "Color Key", font=SECTION_FONT, border=False)
+    r += 1
+    style_cell(ws, r, 1, "Yellow cells = your inputs (replace with your values)",
+               fill=INPUT_FILL)
+    r += 1
+    style_cell(ws, r, 1, "Blue cells = computed values (do not edit)",
+               fill=CALC_FILL)
+    r += 1
+    style_cell(ws, r, 1, "Green cells = key results or cross-tab links",
+               fill=RESULT_FILL)
+
+
 def main():
     wb = openpyxl.Workbook()
     create_tab1_propeller(wb)
     create_tab2_flight_tests(wb)
     create_tab3_data_plate(wb)
     create_tab4_performance(wb)
+    create_tab0_instructions(wb)
 
-    out = "/Users/sritchie/Dropbox/N720AK/BootstrapMethod/bootstrap_method.xlsx"
+    import os
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap_method.xlsx")
     wb.save(out)
     print(f"Saved: {out}")
     print("Upload this file to Google Sheets.")
