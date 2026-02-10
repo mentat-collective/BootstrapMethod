@@ -362,32 +362,6 @@ def create_tab2_flight_tests(wb):
     style_cell(ws, r, 2, "=MAX(H32:H43)", fill=CALC_FILL, fmt="0.0")
     style_cell(ws, r, 3, "Sanity check: Vbg should be near the max row", border=False)
 
-    # Trendline endpoints (used by chart — two points define the fit line)
-    r = 59
-    style_cell(ws, r, 8, "Fit line:", font=BOLD, border=False)
-    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MIN(J32:J43)+B48,"")',
-               fill=CALC_FILL, fmt="0.000")
-    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MIN(J32:J43),"")',
-               fill=CALC_FILL, fmt="0.0")
-    r = 60
-    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MAX(J32:J43)+B48,"")',
-               fill=CALC_FILL, fmt="0.000")
-    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MAX(J32:J43),"")',
-               fill=CALC_FILL, fmt="0.0")
-
-    # Trendline endpoints (two points define the fit line for the chart)
-    r = 59
-    style_cell(ws, r, 8, "Fit line:", font=BOLD, border=False)
-    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MIN(J32:J43)+B48,"")',
-               fill=CALC_FILL, fmt="0.000")
-    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MIN(J32:J43),"")',
-               fill=CALC_FILL, fmt="0.0")
-    r = 60
-    style_cell(ws, r, 9, '=IF(COUNT(I32:I43)>1,B47*MAX(J32:J43)+B48,"")',
-               fill=CALC_FILL, fmt="0.000")
-    style_cell(ws, r, 10, '=IF(COUNT(J32:J43)>1,MAX(J32:J43),"")',
-               fill=CALC_FILL, fmt="0.0")
-
     # === CLIMB TEST DATA (validation) ===
     r = 62
     style_cell(ws, r, 1, "CLIMB TEST RUNS (Validation)", font=SECTION_FONT, border=False)
@@ -481,11 +455,9 @@ def create_tab2_flight_tests(wb):
     series1.graphicalProperties.line.noFill = True  # scatter, no line between points
     chart1.series.append(series1)
 
-    # Manual fit line (two endpoints computed from SLOPE/INTERCEPT)
-    x_fit = Reference(ws, min_col=10, min_row=59, max_row=60)  # V⁴ endpoints
-    y_fit = Reference(ws, min_col=9, min_row=59, max_row=60)   # predicted V/Δt
-    series_fit = Series(y_fit, x_fit, title="Linear fit (R² in B56)")
-    chart1.series.append(series_fit)
+    # Trendline: add manually in Google Sheets (right-click series → Add trendline
+    # → Linear, check "Show R²"). openpyxl trendlines don't render in Sheets.
+    # R² is also computed in B56.
 
     ws.add_chart(chart1, "A86")
 
