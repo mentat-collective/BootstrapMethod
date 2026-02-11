@@ -92,28 +92,45 @@
 ;; =============================================================================
 
 (def r182-data-plate
-  "Vans RV-10 N720AK data plate from bootstp2.xls for validation."
-  {:tail-number "N720AK"
-   :type        "Vans RV-10"
-   :S        148.0    ; wing area, ft²
-   :B        31.75     ; wing span, ft
-   :P0       260.0    ; rated MSL power, hp
-   :N0       2700     ; rated RPM
-   :d        6.67     ; prop diameter, ft
-   :CD0      0.01962  ; parasite drag coefficient
-   :e        0.60462     ; airplane efficiency factor
-   :TAF      187.0    ; total activity factor
-   :Z        0.7    ; fuselage diameter / prop diameter
+  "Cessna R182 N4697K data plate from bootstp2.xls for validation."
+  {:tail-number "N4697K"
+   :type        "Cessna R182"
+   :S        174.0    ; wing area, ft²
+   :B        36.0     ; wing span, ft
+   :P0       235.0    ; rated MSL power, hp
+   :N0       2400     ; rated RPM
+   :d        6.83     ; prop diameter, ft
+   :CD0      0.02874  ; parasite drag coefficient
+   :e        0.72     ; airplane efficiency factor
+   :TAF      195.9    ; total activity factor
+   :Z        0.688    ; fuselage diameter / prop diameter
    :tractor? true
    :BB       2        ; number of blades
    :C        0.12})   ; altitude power dropoff parameter
 
 (def r182-ops
   "Cessna R182 operational variables from bootstp2.xls for validation."
-  {:W         2700.0  ; gross weight, lbs
+  {:W         3100.0  ; gross weight, lbs
    :h         8000    ; density altitude, ft
    :N         2300    ; actual RPM
    :pct-power 0.65})  ; fraction of rated power
+
+(def rv10-data-plate
+  "Vans RV-10 N720AK data plate."
+  {:tail-number "N720AK"
+   :type        "Vans RV-10"
+   :S        148.0    ; wing area, ft²
+   :B        31.75    ; wing span, ft
+   :P0       260.0    ; rated MSL power, hp
+   :N0       2700     ; rated RPM
+   :d        6.67     ; prop diameter, ft
+   :CD0      0.01962  ; parasite drag coefficient (estimate, pending glide tests)
+   :e        0.60462  ; airplane efficiency factor (estimate, pending glide tests)
+   :TAF      187.0    ; total activity factor (Whirlwind 2-blade, R=40")
+   :Z        0.7      ; fuselage diameter / prop diameter
+   :tractor? true
+   :BB       2        ; number of blades
+   :C        0.12})   ; altitude power dropoff parameter
 
 ;; =============================================================================
 ;; Atmospheric Model

@@ -11,7 +11,7 @@
 ;; =============================================================================
 
 (defonce state
-  (r/atom {:data-plate perf/r182-data-plate
+  (r/atom {:data-plate perf/rv10-data-plate
            :W 2200.0
            :h 8000
            :N 2300
