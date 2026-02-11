@@ -102,7 +102,7 @@
    :d        6.67     ; prop diameter, ft
    :CD0      0.01962  ; parasite drag coefficient
    :e        0.60462     ; airplane efficiency factor
-   :TAF      274.1    ; total activity factor
+   :TAF      187.0    ; total activity factor
    :Z        0.7    ; fuselage diameter / prop diameter
    :tractor? true
    :BB       2        ; number of blades
@@ -345,7 +345,7 @@
 
   Options:
     :from  - starting KCAS (default: 60)
-    :to    - ending KCAS (default: 140)
+    :to    - ending KCAS (default: 200)
     :step  - KCAS increment (default: 0.5)
 
   Returns a vector of performance maps, one per airspeed."
