@@ -92,25 +92,25 @@
 ;; =============================================================================
 
 (def r182-data-plate
-  "Cessna R182 N4697K data plate from bootstp2.xls for validation."
-  {:tail-number "N4697K"
-   :type        "Cessna R182"
-   :S        174.0    ; wing area, ft²
-   :B        36.0     ; wing span, ft
-   :P0       235.0    ; rated MSL power, hp
-   :N0       2400     ; rated RPM
-   :d        6.83     ; prop diameter, ft
-   :CD0      0.02874  ; parasite drag coefficient
-   :e        0.72     ; airplane efficiency factor
-   :TAF      195.9    ; total activity factor
-   :Z        0.688    ; fuselage diameter / prop diameter
+  "Vans RV-10 N720AK data plate from bootstp2.xls for validation."
+  {:tail-number "N720AK"
+   :type        "Vans RV-10"
+   :S        148.0    ; wing area, ft²
+   :B        31.75     ; wing span, ft
+   :P0       260.0    ; rated MSL power, hp
+   :N0       2700     ; rated RPM
+   :d        6.67     ; prop diameter, ft
+   :CD0      0.01962  ; parasite drag coefficient
+   :e        0.60462     ; airplane efficiency factor
+   :TAF      274.1    ; total activity factor
+   :Z        0.7    ; fuselage diameter / prop diameter
    :tractor? true
    :BB       2        ; number of blades
    :C        0.12})   ; altitude power dropoff parameter
 
 (def r182-ops
   "Cessna R182 operational variables from bootstp2.xls for validation."
-  {:W         3100.0  ; gross weight, lbs
+  {:W         2700.0  ; gross weight, lbs
    :h         8000    ; density altitude, ft
    :N         2300    ; actual RPM
    :pct-power 0.65})  ; fraction of rated power
@@ -351,7 +351,7 @@
   Returns a vector of performance maps, one per airspeed."
   ([data-plate ops]
    (performance-table data-plate ops {}))
-  ([data-plate ops {:keys [from to step] :or {from 60 to 140 step 0.5}}]
+  ([data-plate ops {:keys [from to step] :or {from 60 to 200 step 0.5}}]
    (let [atm     (atmosphere (:h ops) (:C data-plate))
          speeds  (range from (+ to (/ step 2.0)) step)]
      (mapv #(performance-at-speed data-plate ops atm %) speeds))))
@@ -394,6 +394,101 @@
      :Vbg (select-keys vbg [:KCAS :AOG])
      :Vmd (select-keys vmd [:KCAS :ROS])
      :VM  (when vm (select-keys vm [:KCAS]))}))
+
+;; =============================================================================
+;; Fuel Flow (BSFC model)
+;; =============================================================================
+
+(def ^:const avgas-density
+  "Weight of avgas, lb/gal."
+  6.0)
+
+(defn fuel-flow-gph
+  "Estimate fuel flow in gallons per hour using BSFC model.
+   bhp:  brake horsepower being produced
+   bsfc: brake-specific fuel consumption, lb/hp/hr"
+  [bhp bsfc]
+  (/ (* bhp bsfc) avgas-density))
+
+;; =============================================================================
+;; ForeFlight Performance Profile
+;; =============================================================================
+
+(defn foreflight-profile
+  "Generate a ForeFlight By-Altitude performance profile.
+
+  Sweeps from 0 to service ceiling in alt-step increments, computing climb,
+  cruise, and descent performance at each altitude.
+
+  Config keys:
+    :climb-rpm         - RPM for climb (full throttle)
+    :cruise-rpm        - RPM for cruise
+    :cruise-pct-power  - fraction of rated power for cruise (e.g. 0.65)
+    :bsfc-climb        - BSFC for climb, lb/hp/hr (default 0.50)
+    :bsfc-cruise       - BSFC for cruise, lb/hp/hr (default 0.42)
+    :descent-ff        - descent fuel flow, gph (default 3.0)
+    :alt-step          - altitude increment, ft (default 1000)
+    :ceiling-threshold - min ROC for service ceiling (default 100)
+    :V-max             - max KCAS for speed sweep (default 200)
+
+  Returns:
+    {:ceiling      - service ceiling altitude, ft
+     :rows         - vector of per-altitude maps
+     :climb-ff-low  - climb fuel flow at lowest altitude
+     :climb-ff-high - climb fuel flow at ceiling
+     :descent-ff-low  - descent fuel flow
+     :descent-ff-high - descent fuel flow}"
+  [data-plate weight config]
+  (let [{:keys [climb-rpm cruise-rpm cruise-pct-power
+                bsfc-climb bsfc-cruise descent-ff
+                alt-step ceiling-threshold V-max]
+         :or {alt-step 1000 ceiling-threshold 100 V-max 200
+              bsfc-climb 0.50 bsfc-cruise 0.42 descent-ff 3.0}} config
+        {:keys [P0 C]} data-plate
+        table-opts {:from 45 :to V-max :step 1.0}
+        max-alt 25000]
+    (loop [alt 0
+           rows []]
+      (let [{:keys [phi sigma]} (atmosphere alt C)]
+        (if (or (> alt max-alt) (<= phi 0.0))
+          ;; Engine can't run or exceeded max search altitude
+          (let [ceiling (if (seq rows) (:altitude (peek rows)) 0)]
+            {:ceiling ceiling :rows rows
+             :climb-ff-low  (:fuel-flow-climb (first rows))
+             :climb-ff-high (:fuel-flow-climb (peek rows))
+             :descent-ff-low  descent-ff
+             :descent-ff-high descent-ff})
+          (let [;; Climb: full throttle, capped at rated power
+                climb-pct (min 1.0 phi)
+                climb-ops {:W weight :h alt :N climb-rpm :pct-power climb-pct}
+                climb-tbl (performance-table data-plate climb-ops table-opts)
+                climb-opt (optimum-speeds climb-tbl)
+                roc       (get-in climb-opt [:Vy :ROC])
+
+                ;; Cruise: user power setting, capped by available power
+                cruise-pct (min cruise-pct-power phi)
+                cruise-ops {:W weight :h alt :N cruise-rpm :pct-power cruise-pct}
+                cruise-tbl (performance-table data-plate cruise-ops table-opts)
+                cruise-opt (optimum-speeds cruise-tbl)
+                vm-kcas    (get-in cruise-opt [:VM :KCAS])
+
+                row {:altitude         alt
+                     :climb-ias        (get-in climb-opt [:Vy :KCAS])
+                     :roc              roc
+                     :cruise-tas       (when vm-kcas (/ vm-kcas (sqrt sigma)))
+                     :fuel-flow-cruise (fuel-flow-gph (* P0 cruise-pct) bsfc-cruise)
+                     :fuel-flow-climb  (fuel-flow-gph (* P0 climb-pct) bsfc-climb)
+                     :descent-ias      (get-in climb-opt [:Vbg :KCAS])}
+                new-rows (conj rows row)]
+
+            ;; Stop after this row if ROC is below ceiling threshold
+            (if (and (pos? alt) (or (nil? roc) (<= roc ceiling-threshold)))
+              {:ceiling alt :rows new-rows
+               :climb-ff-low  (:fuel-flow-climb (first new-rows))
+               :climb-ff-high (:fuel-flow-climb (peek new-rows))
+               :descent-ff-low  descent-ff
+               :descent-ff-high descent-ff}
+              (recur (long (+ alt alt-step)) new-rows))))))))
 
 ;; =============================================================================
 ;; Convenience / REPL (JVM only — uses format which is not available in CLJS)

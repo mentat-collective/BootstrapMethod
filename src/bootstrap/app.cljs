@@ -12,13 +12,21 @@
 
 (defonce state
   (r/atom {:data-plate perf/r182-data-plate
-           :W 3100.0
+           :W 2200.0
            :h 8000
            :N 2300
            :pct-power 0.65
            :V-min 45       ; lower bound for performance table (covers low-weight V-speeds)
-           :V-max 140      ; upper bound (increase for faster aircraft, e.g. RV-10: 180)
-           :view :dashboard}))
+           :V-max 200      ; upper bound for speed sweep
+           :view :dashboard
+           ;; ForeFlight profile settings
+           :ff-cruise-pct 0.65
+           :ff-cruise-rpm 2400
+           :ff-climb-rpm 2700
+           :ff-bsfc-climb 0.50
+           :ff-bsfc-cruise 0.42
+           :ff-descent-ff 3.0
+           :ff-copied? false}))
 
 ;; =============================================================================
 ;; Slider component
@@ -42,13 +50,13 @@
   (let [{:keys [W h N pct-power]} @state]
     [:div.controls
      [slider {:label "Gross Weight" :value W
-              :min-val 1800 :max-val 3100 :step 10 :unit "lbs"
+              :min-val 1643 :max-val 2700 :step 10 :unit "lbs"
               :on-change #(swap! state assoc :W %)}]
      [slider {:label "Density Altitude" :value h
               :min-val 0 :max-val 14000 :step 100 :unit "ft"
               :on-change #(swap! state assoc :h %)}]
      [slider {:label "RPM" :value N
-              :min-val 1800 :max-val 2700 :step 50
+              :min-val 1500 :max-val 2700 :step 50
               :on-change #(swap! state assoc :N %)}]
      [slider {:label "% Power" :value (* pct-power 100)
               :min-val 40 :max-val 100 :step 1 :unit "%"
@@ -379,6 +387,126 @@
              [:td.vspeed-label (:label vs)]]))]]]]))
 
 ;; =============================================================================
+;; ForeFlight profile view
+;; =============================================================================
+
+(defn ff-controls-panel []
+  (let [{:keys [W ff-cruise-pct ff-cruise-rpm ff-climb-rpm
+                ff-bsfc-climb ff-bsfc-cruise ff-descent-ff]} @state]
+    [:div.controls
+     [slider {:label "Gross Weight" :value W
+              :min-val 1800 :max-val 3100 :step 10 :unit "lbs"
+              :on-change #(swap! state assoc :W %)}]
+     [slider {:label "Cruise % Power" :value (* ff-cruise-pct 100)
+              :min-val 45 :max-val 100 :step 1 :unit "%"
+              :on-change #(swap! state assoc :ff-cruise-pct (/ % 100))}]
+     [slider {:label "Cruise RPM" :value ff-cruise-rpm
+              :min-val 1800 :max-val 2700 :step 50
+              :on-change #(swap! state assoc :ff-cruise-rpm %)}]
+     [slider {:label "Climb RPM" :value ff-climb-rpm
+              :min-val 1800 :max-val 2700 :step 50
+              :on-change #(swap! state assoc :ff-climb-rpm %)}]
+     [slider {:label "BSFC Climb" :value ff-bsfc-climb
+              :min-val 0.38 :max-val 0.55 :step 0.01 :unit "lb/hp/hr"
+              :on-change #(swap! state assoc :ff-bsfc-climb %)}]
+     [slider {:label "BSFC Cruise" :value ff-bsfc-cruise
+              :min-val 0.35 :max-val 0.55 :step 0.01 :unit "lb/hp/hr"
+              :on-change #(swap! state assoc :ff-bsfc-cruise %)}]
+     [slider {:label "Descent Fuel Flow" :value ff-descent-ff
+              :min-val 1.0 :max-val 10.0 :step 0.5 :unit "gph"
+              :on-change #(swap! state assoc :ff-descent-ff %)}]]))
+
+(defn ff-copy-table [profile]
+  (let [header "Alt\tClimb IAS\tROC\tCruise TAS\tFuel Flow\tDescent IAS"
+        rows (for [{:keys [altitude climb-ias roc cruise-tas
+                           fuel-flow-cruise descent-ias]} (:rows profile)]
+               (str altitude "\t"
+                    (charts/format-num climb-ias 0) "\t"
+                    (charts/format-num roc 0) "\t"
+                    (if cruise-tas (charts/format-num cruise-tas 0) "---") "\t"
+                    (charts/format-num fuel-flow-cruise 1) "\t"
+                    (charts/format-num descent-ias 0)))]
+    (str header "\n" (str/join "\n" rows))))
+
+(defn foreflight-view []
+  (let [{:keys [W ff-cruise-pct ff-cruise-rpm ff-climb-rpm
+                ff-bsfc-climb ff-bsfc-cruise ff-descent-ff ff-copied?]} @state
+        dp (:data-plate @state)
+        profile (perf/foreflight-profile
+                  dp W
+                  {:cruise-pct-power ff-cruise-pct
+                   :cruise-rpm ff-cruise-rpm
+                   :climb-rpm ff-climb-rpm
+                   :bsfc-climb ff-bsfc-climb
+                   :bsfc-cruise ff-bsfc-cruise
+                   :descent-ff ff-descent-ff
+                   :V-max (max (:V-max @state) 200)})]
+    [:div
+     ;; Summary cards
+     [:div.cards
+      [:div.card
+       [:div.card-title "Service Ceiling"]
+       [:div.big-number (charts/format-num (:ceiling profile) 0)
+        [:span.big-number-unit " ft"]]]
+      [:div.card
+       [:div.card-title "Climb Fuel Flow"]
+       [:div.v-speed
+        [:span.v-speed-name "Low Alt"]
+        [:span [:span.v-speed-value (charts/format-num (:climb-ff-low profile) 1)]
+         [:span.v-speed-unit " gph"]]]
+       [:div.v-speed
+        [:span.v-speed-name "High Alt"]
+        [:span [:span.v-speed-value (charts/format-num (:climb-ff-high profile) 1)]
+         [:span.v-speed-unit " gph"]]]]
+      [:div.card
+       [:div.card-title "Descent Fuel Flow"]
+       [:div.v-speed
+        [:span.v-speed-name "Low Alt"]
+        [:span [:span.v-speed-value (charts/format-num (:descent-ff-low profile) 1)]
+         [:span.v-speed-unit " gph"]]]
+       [:div.v-speed
+        [:span.v-speed-name "High Alt"]
+        [:span [:span.v-speed-value (charts/format-num (:descent-ff-high profile) 1)]
+         [:span.v-speed-unit " gph"]]]]]
+
+     ;; Profile table
+     [:div.chart-container
+      [:div {:style {:display "flex" :justify-content "space-between" :align-items "center"}}
+       [:div.chart-title "ForeFlight By-Altitude Profile"]
+       [:div
+        [:button.print-btn {:on-click #(js/window.print)} "Print"]
+        [:button.copy-btn
+         {:on-click (fn []
+                      (let [text (ff-copy-table profile)]
+                        (-> (js/navigator.clipboard.writeText text)
+                            (.then (fn []
+                                     (swap! state assoc :ff-copied? true)
+                                     (js/setTimeout
+                                       #(swap! state assoc :ff-copied? false)
+                                       2000))))))}
+         (if ff-copied? "Copied!" "Copy Table")]]]
+      [:table.ff-table
+       [:thead
+        [:tr
+         [:th "Pressure Alt (ft)"]
+         [:th "Climb IAS (kts)"]
+         [:th "Rate of Climb (fpm)"]
+         [:th "Cruise TAS (kts)"]
+         [:th "Fuel Flow (gph)"]
+         [:th "Descent IAS (kts)"]]]
+       [:tbody
+        (for [{:keys [altitude climb-ias roc cruise-tas
+                      fuel-flow-cruise descent-ias]} (:rows profile)]
+          ^{:key altitude}
+          [:tr {:class (when (= altitude (:ceiling profile)) "ceiling-row")}
+           [:td (str (charts/format-num altitude 0) "'")]
+           [:td (charts/format-num climb-ias 0)]
+           [:td (charts/format-num roc 0)]
+           [:td (if cruise-tas (charts/format-num cruise-tas 0) "---")]
+           [:td (charts/format-num fuel-flow-cruise 1)]
+           [:td (charts/format-num descent-ias 0)]])]]]]))
+
+;; =============================================================================
 ;; About view
 ;; =============================================================================
 
@@ -494,23 +622,27 @@
                         [:poh-charts "POH Charts"]
                         [:table "Table"]
                         [:explore "Explore"]
+                        [:foreflight "ForeFlight"]
                         [:about "About"]]]
         ^{:key k}
         [:button.nav-tab {:class (when (= view k) "active")
                           :on-click #(swap! state assoc :view k)}
          label])]
 
-     ;; Sliders (hidden on About page)
-     (when (not= view :about)
+     ;; Sliders — ForeFlight has its own panel, About has none
+     (case view
+       :about     nil
+       :foreflight [ff-controls-panel]
        [controls-panel])
 
      ;; Active view
      (case view
-       :dashboard [dashboard-view]
+       :dashboard  [dashboard-view]
        :poh-charts [poh-charts-view]
-       :table [table-view]
-       :explore [explore-view]
-       :about [about-view]
+       :table      [table-view]
+       :explore    [explore-view]
+       :foreflight [foreflight-view]
+       :about      [about-view]
        [dashboard-view])]))
 
 ;; =============================================================================

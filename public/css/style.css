@@ -372,9 +372,58 @@ svg text {
 
 .print-btn:hover { opacity: 0.9; }
 
+/* Copy button */
+.copy-btn {
+  padding: 0.5rem 1.25rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  margin-left: 0.5rem;
+  transition: background 0.15s;
+}
+
+.copy-btn:hover { opacity: 0.9; }
+
+/* ForeFlight profile table */
+.ff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.ff-table th {
+  background: var(--primary);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  text-align: right;
+  font-weight: 600;
+}
+
+.ff-table th:first-child { text-align: left; }
+
+.ff-table td {
+  padding: 0.35rem 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.ff-table td:first-child { text-align: left; }
+
+.ff-table tr:nth-child(even) { background: #f8f9fa; }
+
+.ff-table tr.ceiling-row {
+  background: #fef0e0;
+  font-weight: 600;
+}
+
 /* Print styles */
 @media print {
-  .controls, .nav-tabs, .print-btn, .header .aircraft { display: none; }
+  .controls, .nav-tabs, .print-btn, .copy-btn, .header .aircraft { display: none; }
 
   .app { max-width: none; padding: 0; }
 

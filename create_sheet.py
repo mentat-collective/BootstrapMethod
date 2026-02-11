@@ -87,7 +87,7 @@ def create_tab1_propeller(wb):
     style_cell(ws, r, 1, "Station (x = r/R)", font=BOLD)
     style_cell(ws, r, 2, "r = x × R (in)", font=BOLD)
     style_cell(ws, r, 3, "Blade Width b(x) (in)", font=BOLD)
-    style_cell(ws, r, 4, "f(x) = x³ × b(x) / R", font=BOLD)
+    style_cell(ws, r, 4, "f(x) = x³ × b(x)", font=BOLD)
     style_cell(ws, r, 5, "Trap. Weight", font=BOLD)
     style_cell(ws, r, 6, "Weighted f(x)", font=BOLD)
 
@@ -103,13 +103,13 @@ def create_tab1_propeller(wb):
         style_cell(ws, row, 2, f"=A{row}*$B$5", fill=CALC_FILL, fmt="0.00")
         # Blade width: user input
         style_cell(ws, row, 3, None, fill=INPUT_FILL)
-        # f(x) = x³ * b(x) / R
-        style_cell(ws, row, 4, f"=A{row}^3*C{row}/$B$5", fill=CALC_FILL, fmt="0.00000")
+        # f(x) = x³ * b(x)
+        style_cell(ws, row, 4, f"=A{row}^3*C{row}", fill=CALC_FILL, fmt="0.00")
         # Trapezoidal weight: 1 for first and last, 2 for middle
         weight = 1 if (i == 0 or i == len(stations) - 1) else 2
         style_cell(ws, row, 5, weight)
         # Weighted f(x)
-        style_cell(ws, row, 6, f"=D{row}*E{row}", fill=CALC_FILL, fmt="0.00000")
+        style_cell(ws, row, 6, f"=D{row}*E{row}", fill=CALC_FILL, fmt="0.00")
 
     # --- Results ---
     result_row = 11 + len(stations) + 1  # row 29
@@ -117,7 +117,7 @@ def create_tab1_propeller(wb):
 
     r = result_row + 1  # row 30
     style_cell(ws, r, 1, "Sum of weighted f(x):", font=BOLD)
-    style_cell(ws, r, 2, f"=SUM(F11:F{11+len(stations)-1})", fill=CALC_FILL, fmt="0.0000")
+    style_cell(ws, r, 2, f"=SUM(F11:F{11+len(stations)-1})", fill=CALC_FILL, fmt="0.00")
 
     r += 1  # row 31
     # BAF = (78.125 / R) * sum_weighted_f  (Lowry Eq. 6.56)

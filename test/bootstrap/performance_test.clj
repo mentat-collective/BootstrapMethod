@@ -190,3 +190,51 @@
       (is (> (:Dp fast) (* 2.0 (:Dp slow))))
       ;; At higher speed, induced drag should be lower
       (is (< (:Di fast) (:Di slow))))))
+
+;; =============================================================================
+;; Fuel Flow (BSFC model)
+;; =============================================================================
+
+(deftest fuel-flow-test
+  (testing "BSFC fuel flow calculation"
+    ;; 235 HP * 0.50 / 6.0 = 19.583 gph
+    (is-approx (perf/fuel-flow-gph 235.0 0.50) 19.583 0.001)
+    ;; 152.75 HP (65% of 235) * 0.42 / 6.0 = 10.6925 gph
+    (is-approx (perf/fuel-flow-gph 152.75 0.42) 10.6925 0.001)))
+
+;; =============================================================================
+;; ForeFlight Profile
+;; =============================================================================
+
+(deftest foreflight-profile-test
+  (testing "R182 profile has correct structure"
+    (let [profile (perf/foreflight-profile
+                    perf/r182-data-plate 3100.0
+                    {:cruise-pct-power 0.65
+                     :cruise-rpm 2300
+                     :climb-rpm  2400})]
+      ;; Should have rows starting at 0
+      (is (pos? (count (:rows profile))))
+      (is (= 0 (:altitude (first (:rows profile)))))
+
+      ;; Service ceiling should be reasonable for R182 at max gross
+      (is (> (:ceiling profile) 10000))
+      (is (< (:ceiling profile) 25000))
+
+      ;; ROC should decrease with altitude
+      (is (> (:roc (first (:rows profile)))
+             (:roc (last (:rows profile)))))
+
+      ;; All rows should have required ForeFlight fields
+      (doseq [row (:rows profile)]
+        (is (number? (:altitude row)))
+        (is (number? (:climb-ias row)))
+        (is (number? (:roc row)))
+        (is (number? (:descent-ias row)))
+        (is (number? (:fuel-flow-cruise row)))
+        (is (number? (:fuel-flow-climb row))))
+
+      ;; Fuel flow summary should be populated
+      (is (pos? (:climb-ff-low profile)))
+      (is (pos? (:climb-ff-high profile)))
+      (is (pos? (:descent-ff-low profile))))))
