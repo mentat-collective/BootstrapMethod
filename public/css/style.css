@@ -257,6 +257,12 @@ input[type="number"] {
   border-radius: 6px;
   padding: 1rem;
   margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.chart-container svg {
+  max-width: 100%;
+  height: auto;
 }
 
 .chart-title {
